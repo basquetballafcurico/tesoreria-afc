@@ -148,4 +148,134 @@ export default function DashboardPage() {
 
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <div className="card">
-            <p className="kpi-label">Pagado este
+            <p className="kpi-label">Pagado este año</p>
+            <p className="kpi-value">${Math.round(totalPagado).toLocaleString('es-CL')}</p>
+          </div>
+          <div
+            className="card"
+            style={totalPendiente > 0 ? { background: 'var(--warning-bg)' } : { background: 'var(--success-bg)' }}
+          >
+            <p className="kpi-label" style={{ color: totalPendiente > 0 ? 'var(--warning-text)' : 'var(--success-text)' }}>
+              Monto pendiente
+            </p>
+            <p className="kpi-value" style={{ color: totalPendiente > 0 ? 'var(--warning-text)' : 'var(--success-text)' }}>
+              ${Math.round(totalPendiente).toLocaleString('es-CL')}
+            </p>
+          </div>
+        </div>
+
+        <p style={{ fontWeight: 500 }}>Tus cuotas</p>
+        <MyQuotasTable periodos={periodos} cuotasPorPeriodo={cuotasPorPeriodo} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '1.5rem' }}>
+          <ChangePasswordCard />
+
+          <div className="card no-print" style={{ marginBottom: '1.5rem' }}>
+            <p style={{ fontWeight: 500, marginTop: 0, marginBottom: 12 }}>Mi equipo</p>
+            {mensajeEquipo && <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>{mensajeEquipo}</p>}
+            <form onSubmit={guardarMisDatos} style={{ display: 'grid', gap: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={misDatosEquipo.tiene_camiseta}
+                  onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, tiene_camiseta: e.target.checked })}
+                />
+                Tengo camiseta
+              </label>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                  Número de camiseta
+                </label>
+                <input
+                  type="number"
+                  placeholder="Ej: 7"
+                  value={misDatosEquipo.numero_camiseta}
+                  onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, numero_camiseta: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={misDatosEquipo.tiene_salida_cancha}
+                  onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, tiene_salida_cancha: e.target.checked })}
+                />
+                Tengo salida de cancha
+              </label>
+              <button type="submit" disabled={guardandoEquipo}>
+                {guardandoEquipo ? 'Guardando…' : 'Guardar'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const jugadoresConCuotas = jugadores.map((j) => {
+    const cuotasPorPeriodo = {};
+    cuotas
+      .filter((c) => c.jugador_id === j.id)
+      .forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
+    return {
+      nombre: j.nombre,
+      tieneCamiseta: j.tiene_camiseta,
+      numeroCamiseta: j.numero_camiseta,
+      tieneSalidaCancha: j.tiene_salida_cancha,
+      cuotasPorPeriodo,
+    };
+  });
+
+  const totalIngresos = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
+  const totalEgresos = gastos.reduce((acc, g) => acc + Number(g.monto || 0), 0);
+  const saldo = totalIngresos - totalEgresos;
+
+  const sociosAlDia = jugadoresConCuotas.filter((j) =>
+    Object.values(j.cuotasPorPeriodo).length > 0 &&
+    Object.values(j.cuotasPorPeriodo).every((c) => c.estado === 'pagado' || c.estado === 'descuento')
+  ).length;
+
+  const ingresosPorPeriodo = periodos.map((p) =>
+    cuotas.filter((c) => c.periodo === p).reduce((a, c) => a + Number(c.monto_pagado || 0), 0)
+  );
+  const egresosPorPeriodo = periodos.map(() => Math.round(totalEgresos / (periodos.length || 1)));
+
+  const resumenTexto =
+    `Resumen tesorería — Club Alianza Francesa\n\n` +
+    `Ingresos año: $${Math.round(totalIngresos).toLocaleString('es-CL')}\n` +
+    `Egresos año: $${Math.round(totalEgresos).toLocaleString('es-CL')}\n` +
+    `Saldo actual: $${Math.round(saldo).toLocaleString('es-CL')}\n` +
+    `Socios al día: ${sociosAlDia}/${jugadores.length}\n`;
+
+  return (
+    <div className="container">
+      {header}
+
+      <ChangePasswordCard />
+
+      <KpiCards
+        ingresos={totalIngresos}
+        egresos={totalEgresos}
+        saldo={saldo}
+      />
+
+      <div style={{ marginBottom: '1.5rem' }}>
+        <PeriodStatusCards
+          periodos={periodos}
+          jugadoresConCuotas={jugadoresConCuotas}
+          totalSocios={jugadores.length}
+        />
+      </div>
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Ingresos vs egresos</p>
+        <IncomeExpenseChart periodos={periodos} ingresos={ingresosPorPeriodo} egresos={egresosPorPeriodo} />
+      </div>
+
+      <p style={{ fontWeight: 500 }}>Estado de cuotas</p>
+      <QuotasTable jugadores={jugadoresConCuotas} periodos={periodos} />
+
+      <ExportBar resumenTexto={resumenTexto} />
+    </div>
+  );
+}
