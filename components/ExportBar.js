@@ -2,7 +2,7 @@
 
 export default function ExportBar({ resumenTexto }) {
   function enviarCorreo() {
-    const asunto = encodeURIComponent('Resumen tesorería — Club Alianza Francés');
+    const asunto = encodeURIComponent('Resumen tesorería — Club Alianza Francesa');
     const cuerpo = encodeURIComponent(resumenTexto);
     window.location.href = `mailto:?subject=${asunto}&body=${cuerpo}`;
   }
