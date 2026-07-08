@@ -11,6 +11,9 @@ export default function AdminPage() {
 
   const [cuota, setCuota] = useState({ jugador_id: '', periodo: 'T3 2026', monto: 60000, monto_pagado: 0, estado: 'pendiente' });
   const [gasto, setGasto] = useState({ fecha: '', concepto: '', monto: '' });
+  const [datosJugador, setDatosJugador] = useState({
+    jugador_id: '', tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
+  });
 
   useEffect(() => {
     async function verificar() {
@@ -35,6 +38,33 @@ export default function AdminPage() {
     e.preventDefault();
     const { error } = await supabase.from('gastos').insert([gasto]);
     setMensaje(error ? 'Error al guardar el gasto.' : 'Gasto guardado.');
+  }
+
+  function seleccionarJugador(id) {
+    const j = jugadores.find((x) => String(x.id) === String(id));
+    setDatosJugador({
+      jugador_id: id,
+      tiene_camiseta: j?.tiene_camiseta || false,
+      numero_camiseta: j?.numero_camiseta ?? '',
+      tiene_salida_cancha: j?.tiene_salida_cancha || false,
+    });
+  }
+
+  async function guardarDatosJugador(e) {
+    e.preventDefault();
+    const { error } = await supabase
+      .from('jugadores')
+      .update({
+        tiene_camiseta: datosJugador.tiene_camiseta,
+        numero_camiseta: datosJugador.numero_camiseta === '' ? null : Number(datosJugador.numero_camiseta),
+        tiene_salida_cancha: datosJugador.tiene_salida_cancha,
+      })
+      .eq('id', datosJugador.jugador_id);
+    if (!error) {
+      const { data } = await supabase.from('jugadores').select('*').order('nombre');
+      setJugadores(data || []);
+    }
+    setMensaje(error ? 'Error al guardar los datos del jugador.' : 'Datos del jugador actualizados.');
   }
 
   if (!autorizado) return <div className="container">Verificando acceso…</div>;
@@ -64,13 +94,46 @@ export default function AdminPage() {
         </form>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
         <p style={{ fontWeight: 500, marginTop: 0 }}>Registrar gasto</p>
         <form onSubmit={guardarGasto} style={{ display: 'grid', gap: 10 }}>
           <input type="date" value={gasto.fecha} onChange={(e) => setGasto({ ...gasto, fecha: e.target.value })} required />
           <input placeholder="Concepto (ej: Arriendo gimnasio)" value={gasto.concepto} onChange={(e) => setGasto({ ...gasto, concepto: e.target.value })} required />
           <input type="number" placeholder="Monto" value={gasto.monto} onChange={(e) => setGasto({ ...gasto, monto: Number(e.target.value) })} required />
           <button type="submit">Guardar gasto</button>
+        </form>
+      </div>
+
+      <div className="card">
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Camiseta y salida de cancha</p>
+        <form onSubmit={guardarDatosJugador} style={{ display: 'grid', gap: 10 }}>
+          <select value={datosJugador.jugador_id} onChange={(e) => seleccionarJugador(e.target.value)} required>
+            <option value="">Selecciona jugador</option>
+            {jugadores.map((j) => <option key={j.id} value={j.id}>{j.nombre}</option>)}
+          </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={datosJugador.tiene_camiseta}
+              onChange={(e) => setDatosJugador({ ...datosJugador, tiene_camiseta: e.target.checked })}
+            />
+            Tiene camiseta
+          </label>
+          <input
+            type="number"
+            placeholder="Número de camiseta"
+            value={datosJugador.numero_camiseta}
+            onChange={(e) => setDatosJugador({ ...datosJugador, numero_camiseta: e.target.value })}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={datosJugador.tiene_salida_cancha}
+              onChange={(e) => setDatosJugador({ ...datosJugador, tiene_salida_cancha: e.target.checked })}
+            />
+            Tiene salida de cancha
+          </label>
+          <button type="submit" disabled={!datosJugador.jugador_id}>Guardar datos</button>
         </form>
       </div>
     </div>
