@@ -167,7 +167,7 @@ export default function DashboardPage() {
         <p style={{ fontWeight: 500 }}>Tus cuotas</p>
         <MyQuotasTable periodos={periodos} cuotasPorPeriodo={cuotasPorPeriodo} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '1.5rem' }}>
+        <div className="two-col-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '1.5rem' }}>
           <ChangePasswordCard />
 
           <div className="card no-print" style={{ marginBottom: '1.5rem' }}>
