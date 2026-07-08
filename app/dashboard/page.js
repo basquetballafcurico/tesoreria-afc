@@ -46,22 +46,25 @@ export default function DashboardPage() {
     return <div className="container">Cargando…</div>;
   }
 
-  const nombrePorId = Object.fromEntries(jugadores.map((j) => [j.id, j.nombre]));
+  const periodos = [...new Set(cuotas.map((c) => c.periodo))].sort();
 
-  const filasTabla = cuotas.map((c) => ({
-    ...c,
-    nombre: nombrePorId[c.jugador_id] || 'Jugador',
-  }));
+  const jugadoresConCuotas = jugadores.map((j) => {
+    const cuotasPorPeriodo = {};
+    cuotas
+      .filter((c) => c.jugador_id === j.id)
+      .forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
+    return { nombre: j.nombre, cuotasPorPeriodo };
+  });
 
   const totalIngresos = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
   const totalEgresos = gastos.reduce((acc, g) => acc + Number(g.monto || 0), 0);
   const saldo = totalIngresos - totalEgresos;
 
-  const periodos = [...new Set(cuotas.map((c) => c.periodo))].sort();
-  const periodoActual = periodos[periodos.length - 1];
-  const sociosAlDia = cuotas.filter(
-    (c) => c.periodo === periodoActual && c.estado === 'pagado'
+  const sociosAlDia = jugadoresConCuotas.filter((j) =>
+    Object.values(j.cuotasPorPeriodo).length > 0 &&
+    Object.values(j.cuotasPorPeriodo).every((c) => c.estado === 'pagado' || c.estado === 'descuento')
   ).length;
+
   const ingresosPorPeriodo = periodos.map((p) =>
     cuotas.filter((c) => c.periodo === p).reduce((a, c) => a + Number(c.monto_pagado || 0), 0)
   );
@@ -96,7 +99,7 @@ export default function DashboardPage() {
         egresos={totalEgresos}
         saldo={saldo}
         sociosAlDia={sociosAlDia}
-        totalSocios={jugadores.length || filasTabla.length}
+        totalSocios={jugadores.length}
       />
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
@@ -105,7 +108,7 @@ export default function DashboardPage() {
       </div>
 
       <p style={{ fontWeight: 500 }}>Estado de cuotas</p>
-      <QuotasTable filas={filasTabla} />
+      <QuotasTable jugadores={jugadoresConCuotas} periodos={periodos} />
 
       <ExportBar resumenTexto={resumenTexto} />
     </div>
