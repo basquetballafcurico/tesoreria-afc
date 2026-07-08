@@ -26,8 +26,13 @@ export default function LoginPage() {
   return (
     <div className="container" style={{ maxWidth: 380, paddingTop: '4rem' }}>
       <div className="card">
-        <p style={{ fontWeight: 600, marginBottom: 4 }}>Club Alianza Francesa</p>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0, marginBottom: 20 }}>
+        <img
+          src="/logo-af.png"
+          alt="Logo Alianza Francesa Basket"
+          style={{ width: 72, height: 72, display: 'block', margin: '0 auto 12px' }}
+        />
+        <p style={{ fontWeight: 600, marginBottom: 4, textAlign: 'center' }}>Club Alianza Francesa</p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0, marginBottom: 20, textAlign: 'center' }}>
           Tesorería básquetbol
         </p>
         <form onSubmit={handleLogin}>
