@@ -113,3 +113,36 @@ button.secondary {
   body { background: white; }
   .card { border: none; box-shadow: none; }
 }
+
+/* Celulares y pantallas angostas */
+@media (max-width: 640px) {
+  .container {
+    padding: 1rem 0.75rem;
+  }
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .two-col-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .card {
+    padding: 1rem;
+  }
+  .export-bar {
+    flex-direction: column;
+  }
+  table {
+    font-size: 13px;
+  }
+  th, td {
+    padding: 8px 6px;
+  }
+  /* Tablas anchas (Estado de cuotas) se pueden desplazar horizontalmente
+     sin romper el resto del diseño */
+  .card > table,
+  .card > div > table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
