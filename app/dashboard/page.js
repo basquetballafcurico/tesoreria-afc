@@ -110,7 +110,12 @@ export default function DashboardPage() {
           {esAdmin ? 'Vista de dirigente' : 'Tu estado de cuenta'}
         </p>
       </div>
-      <button className="secondary" onClick={cerrarSesion}>Cerrar sesión</button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {esAdmin && (
+          <button className="secondary" onClick={() => router.push('/admin')}>Administración</button>
+        )}
+        <button className="secondary" onClick={cerrarSesion}>Cerrar sesión</button>
+      </div>
     </div>
   );
 
