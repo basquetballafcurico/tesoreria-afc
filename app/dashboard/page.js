@@ -17,6 +17,12 @@ export default function DashboardPage() {
   const [gastos, setGastos] = useState([]);
   const [jugadores, setJugadores] = useState([]);
 
+  const [misDatosEquipo, setMisDatosEquipo] = useState({
+    tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
+  });
+  const [guardandoEquipo, setGuardandoEquipo] = useState(false);
+  const [mensajeEquipo, setMensajeEquipo] = useState('');
+
   useEffect(() => {
     async function cargar() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -40,9 +46,48 @@ export default function DashboardPage() {
       setGastos(gastosData || []);
       setJugadores(jugadoresData || []);
       setLoading(false);
+
+      if (perfilData?.jugador_id) {
+        const mio = (jugadoresData || []).find((j) => j.id === perfilData.jugador_id);
+        if (mio) {
+          setMisDatosEquipo({
+            tiene_camiseta: mio.tiene_camiseta || false,
+            numero_camiseta: mio.numero_camiseta ?? '',
+            tiene_salida_cancha: mio.tiene_salida_cancha || false,
+          });
+        }
+      }
     }
     cargar();
   }, [router]);
+
+  async function guardarMisDatos(e) {
+    e.preventDefault();
+    if (!perfil?.jugador_id) return;
+    setGuardandoEquipo(true);
+    const numero = misDatosEquipo.numero_camiseta === '' ? null : Number(misDatosEquipo.numero_camiseta);
+    const { error } = await supabase
+      .from('jugadores')
+      .update({
+        tiene_camiseta: misDatosEquipo.tiene_camiseta,
+        numero_camiseta: numero,
+        tiene_salida_cancha: misDatosEquipo.tiene_salida_cancha,
+      })
+      .eq('id', perfil.jugador_id);
+    setGuardandoEquipo(false);
+    if (!error) {
+      setJugadores((prev) =>
+        prev.map((j) =>
+          j.id === perfil.jugador_id
+            ? { ...j, tiene_camiseta: misDatosEquipo.tiene_camiseta, numero_camiseta: numero, tiene_salida_cancha: misDatosEquipo.tiene_salida_cancha }
+            : j
+        )
+      );
+      setMensajeEquipo('Datos guardados.');
+    } else {
+      setMensajeEquipo('No se pudo guardar. Intenta de nuevo.');
+    }
+  }
 
   if (loading) {
     return <div className="container">Cargando…</div>;
@@ -95,14 +140,48 @@ export default function DashboardPage() {
                   <td style={{ color: 'var(--text-secondary)' }}>Correo</td>
                   <td>{miJugador.email}</td>
                 </tr>
-                <tr>
-                  <td style={{ color: 'var(--text-secondary)' }}>Número de camiseta</td>
-                  <td>{miJugador.numero_camiseta ?? 'Sin asignar'}</td>
-                </tr>
               </tbody>
             </table>
           </div>
         )}
+
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <p style={{ fontWeight: 500, marginTop: 0, marginBottom: 12 }}>Mi equipo</p>
+          {mensajeEquipo && <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>{mensajeEquipo}</p>}
+          <form onSubmit={guardarMisDatos} style={{ display: 'grid', gap: 10, maxWidth: 320 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+              <input
+                type="checkbox"
+                checked={misDatosEquipo.tiene_camiseta}
+                onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, tiene_camiseta: e.target.checked })}
+              />
+              Tengo camiseta
+            </label>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                Número de camiseta
+              </label>
+              <input
+                type="number"
+                placeholder="Ej: 7"
+                value={misDatosEquipo.numero_camiseta}
+                onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, numero_camiseta: e.target.value })}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+              <input
+                type="checkbox"
+                checked={misDatosEquipo.tiene_salida_cancha}
+                onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, tiene_salida_cancha: e.target.checked })}
+              />
+              Tengo salida de cancha
+            </label>
+            <button type="submit" disabled={guardandoEquipo}>
+              {guardandoEquipo ? 'Guardando…' : 'Guardar'}
+            </button>
+          </form>
+        </div>
 
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <div className="card">
@@ -127,8 +206,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const nombrePorId = Object.fromEntries(jugadores.map((j) => [j.id, j.nombre]));
 
   const jugadoresConCuotas = jugadores.map((j) => {
     const cuotasPorPeriodo = {};
