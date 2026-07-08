@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import KpiCards from '../../components/KpiCards';
+import PeriodStatusCards from '../../components/PeriodStatusCards';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import QuotasTable from '../../components/QuotasTable';
 import MyQuotasTable from '../../components/MyQuotasTable';
@@ -68,8 +69,6 @@ export default function DashboardPage() {
   );
 
   if (!esAdmin) {
-    // Vista jugador: gracias a la seguridad de la base de datos, "cuotas"
-    // ya solo trae las filas de este jugador (no ve las de los demás).
     const cuotasPorPeriodo = {};
     cuotas.forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
 
@@ -105,7 +104,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Vista admin: panorama completo del club
   const nombrePorId = Object.fromEntries(jugadores.map((j) => [j.id, j.nombre]));
 
   const jugadoresConCuotas = jugadores.map((j) => {
@@ -145,9 +143,15 @@ export default function DashboardPage() {
         ingresos={totalIngresos}
         egresos={totalEgresos}
         saldo={saldo}
-        sociosAlDia={sociosAlDia}
-        totalSocios={jugadores.length}
       />
+
+      <div style={{ marginBottom: '1.5rem' }}>
+        <PeriodStatusCards
+          periodos={periodos}
+          jugadoresConCuotas={jugadoresConCuotas}
+          totalSocios={jugadores.length}
+        />
+      </div>
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <p style={{ fontWeight: 500, marginTop: 0 }}>Ingresos vs egresos</p>
