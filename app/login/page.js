@@ -26,7 +26,7 @@ export default function LoginPage() {
   return (
     <div className="container" style={{ maxWidth: 380, paddingTop: '4rem' }}>
       <div className="card">
-        <p style={{ fontWeight: 600, marginBottom: 4 }}>Club Alianza Francés</p>
+        <p style={{ fontWeight: 600, marginBottom: 4 }}>Club Alianza Francesa</p>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0, marginBottom: 20 }}>
           Tesorería básquetbol
         </p>
