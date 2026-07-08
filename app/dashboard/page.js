@@ -56,9 +56,12 @@ export default function DashboardPage() {
   const totalIngresos = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
   const totalEgresos = gastos.reduce((acc, g) => acc + Number(g.monto || 0), 0);
   const saldo = totalIngresos - totalEgresos;
-  const sociosAlDia = cuotas.filter((c) => c.estado === 'pagado').length;
 
-  const periodos = [...new Set(cuotas.map((c) => c.periodo))];
+  const periodos = [...new Set(cuotas.map((c) => c.periodo))].sort();
+  const periodoActual = periodos[periodos.length - 1];
+  const sociosAlDia = cuotas.filter(
+    (c) => c.periodo === periodoActual && c.estado === 'pagado'
+  ).length;
   const ingresosPorPeriodo = periodos.map((p) =>
     cuotas.filter((c) => c.periodo === p).reduce((a, c) => a + Number(c.monto_pagado || 0), 0)
   );
