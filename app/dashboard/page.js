@@ -69,6 +69,7 @@ export default function DashboardPage() {
   );
 
   if (!esAdmin) {
+    const miJugador = jugadores.find((j) => j.id === perfil?.jugador_id);
     const cuotasPorPeriodo = {};
     cuotas.forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
 
@@ -80,6 +81,29 @@ export default function DashboardPage() {
     return (
       <div className="container">
         {header}
+
+        {miJugador && (
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <p style={{ fontWeight: 500, marginTop: 0, marginBottom: 12 }}>Mis datos</p>
+            <table>
+              <tbody>
+                <tr>
+                  <td style={{ color: 'var(--text-secondary)', width: 160 }}>Nombre</td>
+                  <td>{miJugador.nombre}</td>
+                </tr>
+                <tr>
+                  <td style={{ color: 'var(--text-secondary)' }}>Correo</td>
+                  <td>{miJugador.email}</td>
+                </tr>
+                <tr>
+                  <td style={{ color: 'var(--text-secondary)' }}>Número de camiseta</td>
+                  <td>{miJugador.numero_camiseta ?? 'Sin asignar'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <div className="card">
             <p className="kpi-label">Pagado este año</p>
@@ -111,7 +135,13 @@ export default function DashboardPage() {
     cuotas
       .filter((c) => c.jugador_id === j.id)
       .forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
-    return { nombre: j.nombre, cuotasPorPeriodo };
+    return {
+      nombre: j.nombre,
+      tieneCamiseta: j.tiene_camiseta,
+      numeroCamiseta: j.numero_camiseta,
+      tieneSalidaCancha: j.tiene_salida_cancha,
+      cuotasPorPeriodo,
+    };
   });
 
   const totalIngresos = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
