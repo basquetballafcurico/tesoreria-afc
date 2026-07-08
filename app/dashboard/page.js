@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import KpiCards from '../../components/KpiCards';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import QuotasTable from '../../components/QuotasTable';
+import MyQuotasTable from '../../components/MyQuotasTable';
 import ExportBar from '../../components/ExportBar';
 
 export default function DashboardPage() {
@@ -46,7 +47,66 @@ export default function DashboardPage() {
     return <div className="container">Cargando…</div>;
   }
 
+  const esAdmin = perfil?.rol === 'admin';
   const periodos = [...new Set(cuotas.map((c) => c.periodo))].sort();
+
+  async function cerrarSesion() {
+    await supabase.auth.signOut();
+    router.push('/login');
+  }
+
+  const header = (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="no-print">
+      <div>
+        <p style={{ fontWeight: 600, margin: 0 }}>Tesorería — Club Alianza Francés</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+          {esAdmin ? 'Vista de dirigente' : 'Tu estado de cuenta'}
+        </p>
+      </div>
+      <button className="secondary" onClick={cerrarSesion}>Cerrar sesión</button>
+    </div>
+  );
+
+  if (!esAdmin) {
+    // Vista jugador: gracias a la seguridad de la base de datos, "cuotas"
+    // ya solo trae las filas de este jugador (no ve las de los demás).
+    const cuotasPorPeriodo = {};
+    cuotas.forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
+
+    const totalPagado = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
+    const totalPendiente = cuotas.reduce(
+      (acc, c) => acc + Math.max(Number(c.monto || 0) - Number(c.monto_pagado || 0), 0), 0
+    );
+
+    return (
+      <div className="container">
+        {header}
+        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+          <div className="card">
+            <p className="kpi-label">Pagado este año</p>
+            <p className="kpi-value">${Math.round(totalPagado).toLocaleString('es-CL')}</p>
+          </div>
+          <div
+            className="card"
+            style={totalPendiente > 0 ? { background: 'var(--warning-bg)' } : { background: 'var(--success-bg)' }}
+          >
+            <p className="kpi-label" style={{ color: totalPendiente > 0 ? 'var(--warning-text)' : 'var(--success-text)' }}>
+              Monto pendiente
+            </p>
+            <p className="kpi-value" style={{ color: totalPendiente > 0 ? 'var(--warning-text)' : 'var(--success-text)' }}>
+              ${Math.round(totalPendiente).toLocaleString('es-CL')}
+            </p>
+          </div>
+        </div>
+
+        <p style={{ fontWeight: 500 }}>Tus cuotas</p>
+        <MyQuotasTable periodos={periodos} cuotasPorPeriodo={cuotasPorPeriodo} />
+      </div>
+    );
+  }
+
+  // Vista admin: panorama completo del club
+  const nombrePorId = Object.fromEntries(jugadores.map((j) => [j.id, j.nombre]));
 
   const jugadoresConCuotas = jugadores.map((j) => {
     const cuotasPorPeriodo = {};
@@ -77,22 +137,9 @@ export default function DashboardPage() {
     `Saldo actual: $${Math.round(saldo).toLocaleString('es-CL')}\n` +
     `Socios al día: ${sociosAlDia}/${jugadores.length}\n`;
 
-  async function cerrarSesion() {
-    await supabase.auth.signOut();
-    router.push('/login');
-  }
-
   return (
     <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="no-print">
-        <div>
-          <p style={{ fontWeight: 600, margin: 0 }}>Tesorería — Club Alianza Francés</p>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-            {perfil?.rol === 'admin' ? 'Vista de dirigente' : 'Tu estado de cuenta'}
-          </p>
-        </div>
-        <button className="secondary" onClick={cerrarSesion}>Cerrar sesión</button>
-      </div>
+      {header}
 
       <KpiCards
         ingresos={totalIngresos}
