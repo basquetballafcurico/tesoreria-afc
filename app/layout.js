@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Tesorería Club Alianza Francés',
+  title: 'Tesorería Club Alianza Francesa',
   description: 'Control de ingresos y egresos del club',
 };
 
