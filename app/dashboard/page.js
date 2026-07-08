@@ -8,6 +8,7 @@ import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import QuotasTable from '../../components/QuotasTable';
 import MyQuotasTable from '../../components/MyQuotasTable';
 import ExportBar from '../../components/ExportBar';
+import ChangePasswordCard from '../../components/ChangePasswordCard';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -145,6 +146,8 @@ export default function DashboardPage() {
           </div>
         )}
 
+        <ChangePasswordCard />
+
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <p style={{ fontWeight: 500, marginTop: 0, marginBottom: 12 }}>Mi equipo</p>
           {mensajeEquipo && <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>{mensajeEquipo}</p>}
@@ -245,6 +248,8 @@ export default function DashboardPage() {
   return (
     <div className="container">
       {header}
+
+      <ChangePasswordCard />
 
       <KpiCards
         ingresos={totalIngresos}
