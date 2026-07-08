@@ -251,8 +251,6 @@ export default function DashboardPage() {
     <div className="container">
       {header}
 
-      <ChangePasswordCard />
-
       <KpiCards
         ingresos={totalIngresos}
         egresos={totalEgresos}
@@ -276,6 +274,10 @@ export default function DashboardPage() {
       <QuotasTable jugadores={jugadoresConCuotas} periodos={periodos} />
 
       <ExportBar resumenTexto={resumenTexto} />
+
+      <div style={{ marginTop: '1.5rem' }}>
+        <ChangePasswordCard />
+      </div>
     </div>
   );
 }
