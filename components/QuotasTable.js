@@ -19,6 +19,9 @@ export default function QuotasTable({ jugadores, periodos }) {
         <thead>
           <tr>
             <th>Jugador</th>
+            <th>Camiseta</th>
+            <th>N°</th>
+            <th>Salida cancha</th>
             {periodos.map((p) => (
               <th key={p}>{p}</th>
             ))}
@@ -28,6 +31,9 @@ export default function QuotasTable({ jugadores, periodos }) {
           {jugadores.map((j) => (
             <tr key={j.nombre}>
               <td>{j.nombre}</td>
+              <td>{j.tieneCamiseta ? 'Sí' : 'No'}</td>
+              <td>{j.numeroCamiseta ?? '—'}</td>
+              <td>{j.tieneSalidaCancha ? 'Sí' : 'No'}</td>
               {periodos.map((p) => {
                 const c = j.cuotasPorPeriodo[p];
                 if (!c) return <td key={p} style={{ color: 'var(--text-secondary)' }}>—</td>;
