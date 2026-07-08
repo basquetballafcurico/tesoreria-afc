@@ -116,7 +116,10 @@ export default function AdminPage() {
 
   return (
     <div className="container">
-      <p style={{ fontWeight: 600 }}>Administración</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p style={{ fontWeight: 600 }}>Administración</p>
+        <button className="secondary" onClick={() => router.push('/dashboard')}>Volver al dashboard</button>
+      </div>
       {mensaje && <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{mensaje}</p>}
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
