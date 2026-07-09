@@ -10,6 +10,7 @@ export default function AdminPage() {
   const [cuotas, setCuotas] = useState([]);
   const [inventario, setInventario] = useState([]);
   const [mensaje, setMensaje] = useState('');
+  const [mensajeTipo, setMensajeTipo] = useState('success');
 
   const periodosConocidos = ['T1 2026', 'T2 2026', 'T3 2026'];
 
@@ -23,6 +24,12 @@ export default function AdminPage() {
   const [item, setItem] = useState({
     id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '',
   });
+
+  useEffect(() => {
+    if (!mensaje) return;
+    const t = setTimeout(() => setMensaje(''), 4000);
+    return () => clearTimeout(t);
+  }, [mensaje]);
 
   useEffect(() => {
     async function verificar() {
@@ -40,6 +47,11 @@ export default function AdminPage() {
     }
     verificar();
   }, [router]);
+
+  function mostrarMensaje(texto, tipo) {
+    setMensaje(texto);
+    setMensajeTipo(tipo);
+  }
 
   function cargarCuotaExistente(jugadorId, periodo) {
     const existente = (jugadorId && periodo)
@@ -75,13 +87,13 @@ export default function AdminPage() {
       const { data: cuotasData } = await supabase.from('cuotas').select('*');
       setCuotas(cuotasData || []);
     }
-    setMensaje(error ? 'Error al guardar el pago.' : 'Pago guardado.');
+    mostrarMensaje(error ? 'Error al guardar el pago.' : 'Pago guardado correctamente.', error ? 'error' : 'success');
   }
 
   async function guardarGasto(e) {
     e.preventDefault();
     const { error } = await supabase.from('gastos').insert([gasto]);
-    setMensaje(error ? 'Error al guardar el gasto.' : 'Gasto guardado.');
+    mostrarMensaje(error ? 'Error al guardar el gasto.' : 'Gasto guardado correctamente.', error ? 'error' : 'success');
     if (!error) setGasto({ fecha: '', concepto: '', monto: '' });
   }
 
@@ -109,7 +121,7 @@ export default function AdminPage() {
       const { data } = await supabase.from('jugadores').select('*').order('nombre');
       setJugadores(data || []);
     }
-    setMensaje(error ? 'Error al guardar los datos del jugador.' : 'Datos del jugador actualizados.');
+    mostrarMensaje(error ? 'Error al guardar los datos del jugador.' : 'Datos del jugador actualizados correctamente.', error ? 'error' : 'success');
   }
 
   const [enviandoRecordatorios, setEnviandoRecordatorios] = useState(false);
@@ -117,7 +129,7 @@ export default function AdminPage() {
 
   async function enviarRecordatoriosAhora(modoPrueba) {
     if (modoPrueba && !correoPrueba) {
-      setMensaje('Escribe tu correo arriba para hacer la prueba.');
+      mostrarMensaje('Escribe tu correo arriba para hacer la prueba.', 'error');
       return;
     }
     setEnviandoRecordatorios(true);
@@ -132,9 +144,9 @@ export default function AdminPage() {
         body: JSON.stringify({ correoPrueba: modoPrueba ? correoPrueba : null }),
       });
       const data = await res.json();
-      setMensaje(res.ok ? `Recordatorios enviados: ${data.enviados}` : `Error: ${data.error}`);
+      mostrarMensaje(res.ok ? `Recordatorios enviados correctamente: ${data.enviados}` : `Error: ${data.error}`, res.ok ? 'success' : 'error');
     } catch (e) {
-      setMensaje('No se pudo conectar con el servidor.');
+      mostrarMensaje('No se pudo conectar con el servidor.', 'error');
     }
     setEnviandoRecordatorios(false);
   }
@@ -159,7 +171,7 @@ export default function AdminPage() {
       setInventario(data || []);
       setItem({ id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '' });
     }
-    setMensaje(error ? 'Error al guardar el artículo.' : 'Artículo guardado.');
+    mostrarMensaje(error ? 'Error al guardar el artículo.' : 'Artículo guardado correctamente.', error ? 'error' : 'success');
   }
 
   function editarItem(i) {
@@ -173,7 +185,7 @@ export default function AdminPage() {
     if (!error) {
       setInventario((prev) => prev.filter((i) => i.id !== id));
     }
-    setMensaje(error ? 'Error al borrar el artículo.' : 'Artículo borrado.');
+    mostrarMensaje(error ? 'Error al borrar el artículo.' : 'Artículo borrado correctamente.', error ? 'error' : 'success');
   }
 
   if (!autorizado) return <div className="container">Verificando acceso…</div>;
@@ -184,7 +196,20 @@ export default function AdminPage() {
         <p style={{ fontWeight: 600 }}>Administración</p>
         <button className="secondary" onClick={() => router.push('/dashboard')}>Volver al dashboard</button>
       </div>
-      {mensaje && <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{mensaje}</p>}
+      {mensaje && (
+        <div
+          className="card"
+          style={{
+            marginBottom: '1.5rem',
+            padding: '0.75rem 1rem',
+            background: mensajeTipo === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+            color: mensajeTipo === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
+            fontWeight: 500,
+          }}
+        >
+          {mensajeTipo === 'success' ? '✓ ' : '⚠ '}{mensaje}
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <p style={{ fontWeight: 500, marginTop: 0 }}>Registrar / actualizar pago de cuota</p>
