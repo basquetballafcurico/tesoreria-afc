@@ -20,6 +20,7 @@ export default function AdminPage() {
     jugador_id: '', tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
   });
   const [enviandoRecordatorios, setEnviandoRecordatorios] = useState(false);
+  const [correoPrueba, setCorreoPrueba] = useState('');
 
   useEffect(() => {
     async function verificar() {
@@ -113,13 +114,21 @@ export default function AdminPage() {
     setMensaje(error ? 'Error al guardar los datos del jugador.' : 'Datos del jugador actualizados.');
   }
 
-  async function enviarRecordatoriosAhora() {
+  async function enviarRecordatoriosAhora(modoPrueba) {
+    if (modoPrueba && !correoPrueba) {
+      setMensaje('Escribe tu correo arriba para hacer la prueba.');
+      return;
+    }
     setEnviandoRecordatorios(true);
     const { data: { session } } = await supabase.auth.getSession();
     try {
       const res = await fetch('/api/recordatorios', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ correoPrueba: modoPrueba ? correoPrueba : null }),
       });
       const data = await res.json();
       setMensaje(res.ok ? `Recordatorios enviados: ${data.enviados}` : `Error: ${data.error}`);
@@ -216,11 +225,30 @@ export default function AdminPage() {
       <div className="card">
         <p style={{ fontWeight: 500, marginTop: 0 }}>Recordatorios de pago</p>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
-          Se envían solos el día 1 de cada mes a quienes tengan cuotas pendientes. Puedes forzar un envío ahora para probar.
+          Se envían solos el día 1 de cada mes a quienes tengan cuotas pendientes.
         </p>
-        <button onClick={enviarRecordatoriosAhora} disabled={enviandoRecordatorios}>
-          {enviandoRecordatorios ? 'Enviando…' : 'Enviar recordatorios ahora'}
-        </button>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+            Tu correo (para probar antes de mandar a todos)
+          </label>
+          <input
+            type="email"
+            placeholder="tu-correo@ejemplo.cl"
+            value={correoPrueba}
+            onChange={(e) => setCorreoPrueba(e.target.value)}
+            style={{ width: '100%', maxWidth: 320 }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="secondary" onClick={() => enviarRecordatoriosAhora(true)} disabled={enviandoRecordatorios}>
+            {enviandoRecordatorios ? 'Enviando…' : 'Probar (todo llega a mi correo)'}
+          </button>
+          <button onClick={() => enviarRecordatoriosAhora(false)} disabled={enviandoRecordatorios}>
+            {enviandoRecordatorios ? 'Enviando…' : 'Enviar de verdad a todos los jugadores'}
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ marginTop: '1.5rem' }}>
