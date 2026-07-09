@@ -19,6 +19,7 @@ export default function AdminPage() {
   const [datosJugador, setDatosJugador] = useState({
     jugador_id: '', tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
   });
+  const [enviandoRecordatorios, setEnviandoRecordatorios] = useState(false);
 
   useEffect(() => {
     async function verificar() {
@@ -112,6 +113,22 @@ export default function AdminPage() {
     setMensaje(error ? 'Error al guardar los datos del jugador.' : 'Datos del jugador actualizados.');
   }
 
+  async function enviarRecordatoriosAhora() {
+    setEnviandoRecordatorios(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const res = await fetch('/api/recordatorios', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      setMensaje(res.ok ? `Recordatorios enviados: ${data.enviados}` : `Error: ${data.error}`);
+    } catch (e) {
+      setMensaje('No se pudo conectar con el servidor.');
+    }
+    setEnviandoRecordatorios(false);
+  }
+
   if (!autorizado) return <div className="container">Verificando acceso…</div>;
 
   return (
@@ -197,6 +214,16 @@ export default function AdminPage() {
       </div>
 
       <div className="card">
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Recordatorios de pago</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Se envían solos el día 1 de cada mes a quienes tengan cuotas pendientes. Puedes forzar un envío ahora para probar.
+        </p>
+        <button onClick={enviarRecordatoriosAhora} disabled={enviandoRecordatorios}>
+          {enviandoRecordatorios ? 'Enviando…' : 'Enviar recordatorios ahora'}
+        </button>
+      </div>
+
+      <div className="card" style={{ marginTop: '1.5rem' }}>
         <p style={{ fontWeight: 500, marginTop: 0 }}>Camiseta y salida de cancha</p>
         <form onSubmit={guardarDatosJugador} style={{ display: 'grid', gap: 10 }}>
           <select value={datosJugador.jugador_id} onChange={(e) => seleccionarJugador(e.target.value)} required>
