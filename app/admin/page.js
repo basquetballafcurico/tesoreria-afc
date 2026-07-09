@@ -42,24 +42,18 @@ export default function AdminPage() {
   }, [router]);
 
   function cargarCuotaExistente(jugadorId, periodo) {
-    if (!jugadorId || !periodo) return;
-    const existente = cuotas.find(
-      (c) => String(c.jugador_id) === String(jugadorId) && c.periodo === periodo
-    );
-    if (existente) {
-      setPago({
-        jugador_id: jugadorId,
-        periodo,
-        monto: existente.monto,
-        monto_pagado: existente.monto_pagado,
-        estado: existente.estado,
-        observaciones: existente.observaciones || '',
-      });
-    } else {
-      setPago({
-        jugador_id: jugadorId, periodo, monto: 60000, monto_pagado: 0, estado: 'pendiente', observaciones: '',
-      });
-    }
+    const existente = (jugadorId && periodo)
+      ? cuotas.find((c) => String(c.jugador_id) === String(jugadorId) && c.periodo === periodo)
+      : null;
+
+    setPago({
+      jugador_id: jugadorId,
+      periodo,
+      monto: existente ? existente.monto : 60000,
+      monto_pagado: existente ? existente.monto_pagado : 0,
+      estado: existente ? existente.estado : 'pendiente',
+      observaciones: existente ? (existente.observaciones || '') : '',
+    });
   }
 
   async function guardarPago(e) {
