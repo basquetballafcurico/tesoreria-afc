@@ -25,6 +25,7 @@ export default function DashboardPage() {
   });
   const [guardandoEquipo, setGuardandoEquipo] = useState(false);
   const [mensajeEquipo, setMensajeEquipo] = useState('');
+  const [mensajeEquipoTipo, setMensajeEquipoTipo] = useState('success');
 
   useEffect(() => {
     async function cargar() {
@@ -88,11 +89,19 @@ export default function DashboardPage() {
             : j
         )
       );
-      setMensajeEquipo('Datos guardados.');
+      setMensajeEquipo('Datos guardados correctamente.');
+      setMensajeEquipoTipo('success');
     } else {
       setMensajeEquipo('No se pudo guardar. Intenta de nuevo.');
+      setMensajeEquipoTipo('error');
     }
   }
+
+  useEffect(() => {
+    if (!mensajeEquipo) return;
+    const t = setTimeout(() => setMensajeEquipo(''), 4000);
+    return () => clearTimeout(t);
+  }, [mensajeEquipo]);
 
   if (loading) {
     return <div className="container">Cargando…</div>;
@@ -187,7 +196,21 @@ export default function DashboardPage() {
 
           <div className="card no-print" style={{ marginBottom: '1.5rem' }}>
             <p style={{ fontWeight: 500, marginTop: 0, marginBottom: 12 }}>Mi equipo</p>
-            {mensajeEquipo && <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>{mensajeEquipo}</p>}
+            {mensajeEquipo && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '0.6rem 0.8rem',
+                  borderRadius: 8,
+                  background: mensajeEquipoTipo === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+                  color: mensajeEquipoTipo === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
+                  fontWeight: 500,
+                  fontSize: 14,
+                }}
+              >
+                {mensajeEquipoTipo === 'success' ? '✓ ' : '⚠ '}{mensajeEquipo}
+              </div>
+            )}
             <form onSubmit={guardarMisDatos} style={{ display: 'grid', gap: 10 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
                 <input
