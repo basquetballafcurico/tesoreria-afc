@@ -9,6 +9,7 @@ import QuotasTable from '../../components/QuotasTable';
 import MyQuotasTable from '../../components/MyQuotasTable';
 import ExportBar from '../../components/ExportBar';
 import ChangePasswordCard from '../../components/ChangePasswordCard';
+import InventoryTable from '../../components/InventoryTable';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const [cuotas, setCuotas] = useState([]);
   const [gastos, setGastos] = useState([]);
   const [jugadores, setJugadores] = useState([]);
+  const [inventario, setInventario] = useState([]);
 
   const [misDatosEquipo, setMisDatosEquipo] = useState({
     tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
@@ -42,10 +44,12 @@ export default function DashboardPage() {
       const { data: cuotasData } = await supabase.from('cuotas').select('*');
       const { data: gastosData } = await supabase.from('gastos').select('*');
       const { data: jugadoresData } = await supabase.from('jugadores').select('*');
+      const { data: inventarioData } = await supabase.from('inventario').select('*').order('categoria');
 
       setCuotas(cuotasData || []);
       setGastos(gastosData || []);
       setJugadores(jugadoresData || []);
+      setInventario(inventarioData || []);
       setLoading(false);
 
       if (perfilData?.jugador_id) {
@@ -104,11 +108,14 @@ export default function DashboardPage() {
 
   const header = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="no-print">
-      <div>
-        <p style={{ fontWeight: 600, margin: 0 }}>Tesorería — Club Alianza Francesa</p>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-          {esAdmin ? 'Vista de dirigente' : 'Tu estado de cuenta'}
-        </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <img src="/logo-af.png" alt="Logo Alianza Francesa Basket" style={{ width: 40, height: 40 }} />
+        <div>
+          <p style={{ fontWeight: 600, margin: 0 }}>Tesorería — Club Alianza Francesa</p>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+            {esAdmin ? 'Vista de dirigente' : 'Tu estado de cuenta'}
+          </p>
+        </div>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         {esAdmin && (
@@ -172,7 +179,10 @@ export default function DashboardPage() {
         <p style={{ fontWeight: 500 }}>Tus cuotas</p>
         <MyQuotasTable periodos={periodos} cuotasPorPeriodo={cuotasPorPeriodo} />
 
-        <div className="two-col-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: '1.5rem' }}>Inventario del club</p>
+        <InventoryTable items={inventario} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '1.5rem' }}>
           <ChangePasswordCard />
 
           <div className="card no-print" style={{ marginBottom: '1.5rem' }}>
@@ -277,6 +287,9 @@ export default function DashboardPage() {
 
       <p style={{ fontWeight: 500 }}>Estado de cuotas</p>
       <QuotasTable jugadores={jugadoresConCuotas} periodos={periodos} />
+
+      <p style={{ fontWeight: 500, marginTop: '1.5rem' }}>Inventario del club</p>
+      <InventoryTable items={inventario} />
 
       <ExportBar resumenTexto={resumenTexto} />
 
