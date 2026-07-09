@@ -8,6 +8,7 @@ export default function AdminPage() {
   const [autorizado, setAutorizado] = useState(false);
   const [jugadores, setJugadores] = useState([]);
   const [cuotas, setCuotas] = useState([]);
+  const [inventario, setInventario] = useState([]);
   const [mensaje, setMensaje] = useState('');
 
   const periodosConocidos = ['T1 2026', 'T2 2026', 'T3 2026'];
@@ -19,8 +20,9 @@ export default function AdminPage() {
   const [datosJugador, setDatosJugador] = useState({
     jugador_id: '', tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
   });
-  const [enviandoRecordatorios, setEnviandoRecordatorios] = useState(false);
-  const [correoPrueba, setCorreoPrueba] = useState('');
+  const [item, setItem] = useState({
+    id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '',
+  });
 
   useEffect(() => {
     async function verificar() {
@@ -33,6 +35,8 @@ export default function AdminPage() {
       setJugadores(jugadoresData || []);
       const { data: cuotasData } = await supabase.from('cuotas').select('*');
       setCuotas(cuotasData || []);
+      const { data: inventarioData } = await supabase.from('inventario').select('*').order('categoria');
+      setInventario(inventarioData || []);
     }
     verificar();
   }, [router]);
@@ -114,6 +118,9 @@ export default function AdminPage() {
     setMensaje(error ? 'Error al guardar los datos del jugador.' : 'Datos del jugador actualizados.');
   }
 
+  const [enviandoRecordatorios, setEnviandoRecordatorios] = useState(false);
+  const [correoPrueba, setCorreoPrueba] = useState('');
+
   async function enviarRecordatoriosAhora(modoPrueba) {
     if (modoPrueba && !correoPrueba) {
       setMensaje('Escribe tu correo arriba para hacer la prueba.');
@@ -136,6 +143,43 @@ export default function AdminPage() {
       setMensaje('No se pudo conectar con el servidor.');
     }
     setEnviandoRecordatorios(false);
+  }
+
+  async function guardarItem(e) {
+    e.preventDefault();
+    const datos = {
+      nombre: item.nombre,
+      categoria: item.categoria,
+      cantidad: Number(item.cantidad),
+      estado: item.estado,
+      notas: item.notas,
+    };
+    let error;
+    if (item.id) {
+      ({ error } = await supabase.from('inventario').update(datos).eq('id', item.id));
+    } else {
+      ({ error } = await supabase.from('inventario').insert([datos]));
+    }
+    if (!error) {
+      const { data } = await supabase.from('inventario').select('*').order('categoria');
+      setInventario(data || []);
+      setItem({ id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '' });
+    }
+    setMensaje(error ? 'Error al guardar el artículo.' : 'Artículo guardado.');
+  }
+
+  function editarItem(i) {
+    setItem({
+      id: i.id, nombre: i.nombre, categoria: i.categoria, cantidad: i.cantidad, estado: i.estado, notas: i.notas || '',
+    });
+  }
+
+  async function borrarItem(id) {
+    const { error } = await supabase.from('inventario').delete().eq('id', id);
+    if (!error) {
+      setInventario((prev) => prev.filter((i) => i.id !== id));
+    }
+    setMensaje(error ? 'Error al borrar el artículo.' : 'Artículo borrado.');
   }
 
   if (!autorizado) return <div className="container">Verificando acceso…</div>;
@@ -249,6 +293,87 @@ export default function AdminPage() {
             {enviandoRecordatorios ? 'Enviando…' : 'Enviar de verdad a todos los jugadores'}
           </button>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Inventario del club</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Visible para todos (jugadores y admin). Solo tú puedes agregar, editar o borrar.
+        </p>
+        <form onSubmit={guardarItem} style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+          <input
+            placeholder="Nombre del artículo (ej: Pelotas talla 7)"
+            value={item.nombre}
+            onChange={(e) => setItem({ ...item, nombre: e.target.value })}
+            required
+          />
+          <select value={item.categoria} onChange={(e) => setItem({ ...item, categoria: e.target.value })}>
+            <option value="Pelotas">Pelotas</option>
+            <option value="Petos">Petos</option>
+            <option value="Botiquín">Botiquín</option>
+            <option value="Uniformes">Uniformes</option>
+            <option value="Otros">Otros</option>
+          </select>
+          <input
+            type="number"
+            placeholder="Cantidad"
+            value={item.cantidad}
+            onChange={(e) => setItem({ ...item, cantidad: e.target.value })}
+            min="0"
+            required
+          />
+          <select value={item.estado} onChange={(e) => setItem({ ...item, estado: e.target.value })}>
+            <option value="bueno">Bueno</option>
+            <option value="regular">Regular</option>
+            <option value="malo">Malo</option>
+            <option value="perdido">Perdido</option>
+          </select>
+          <input
+            placeholder="Notas (opcional)"
+            value={item.notas}
+            onChange={(e) => setItem({ ...item, notas: e.target.value })}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit">{item.id ? 'Guardar cambios' : 'Agregar artículo'}</button>
+            {item.id && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setItem({ id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '' })}
+              >
+                Cancelar edición
+              </button>
+            )}
+          </div>
+        </form>
+
+        {inventario.length > 0 && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Artículo</th>
+                  <th>Cant.</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventario.map((i) => (
+                  <tr key={i.id}>
+                    <td>{i.nombre} <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>({i.categoria})</span></td>
+                    <td>{i.cantidad}</td>
+                    <td>{i.estado}</td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" className="secondary" onClick={() => editarItem(i)}>Editar</button>
+                      <button type="button" className="secondary" onClick={() => borrarItem(i.id)}>Borrar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: '1.5rem' }}>
