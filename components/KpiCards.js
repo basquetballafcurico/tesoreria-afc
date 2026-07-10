@@ -1,10 +1,11 @@
 export default function KpiCards({ ingresos, egresos, saldo, saldoInicial }) {
-  const fmt = (n) => '$' + Math.round(n).toLocaleString('es-CL');
+  const fmt = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
+  const totalIngresoMasSaldoAnterior = (Number(ingresos) || 0) + (Number(saldoInicial) || 0);
 
   const items = [
     {
       label: `Ingreso año 2026: ${fmt(ingresos)} + Saldo 2025: ${fmt(saldoInicial)}`,
-      value: fmt(ingresos),
+      value: fmt(totalIngresoMasSaldoAnterior),
     },
     { label: 'Egresos año', value: fmt(egresos) },
     { label: 'Saldo actual', value: fmt(saldo), highlight: true },
