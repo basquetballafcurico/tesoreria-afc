@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import KpiCards from '../../components/KpiCards';
 import PeriodStatusCards from '../../components/PeriodStatusCards';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
+import ExpensesPieChart from '../../components/ExpensesPieChart';
 import QuotasTable from '../../components/QuotasTable';
 import MyQuotasTable from '../../components/MyQuotasTable';
 import ExportBar from '../../components/ExportBar';
@@ -304,6 +305,11 @@ export default function DashboardPage() {
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <p style={{ fontWeight: 500, marginTop: 0 }}>Ingresos vs egresos</p>
         <IncomeExpenseChart periodos={periodos} ingresos={ingresosPorPeriodo} egresos={egresosPorPeriodo} />
+      </div>
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Gastos por concepto</p>
+        <ExpensesPieChart gastos={gastos} />
       </div>
 
       <p style={{ fontWeight: 500 }}>Estado de cuotas</p>
