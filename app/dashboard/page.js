@@ -292,6 +292,7 @@ export default function DashboardPage() {
         ingresos={totalIngresos}
         egresos={totalEgresos}
         saldo={saldo}
+        saldoInicial={saldoInicial}
       />
 
       <div style={{ marginBottom: '1.5rem' }}>
