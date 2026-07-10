@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const [gastos, setGastos] = useState([]);
   const [jugadores, setJugadores] = useState([]);
   const [inventario, setInventario] = useState([]);
+  const [saldoInicial, setSaldoInicial] = useState(0);
 
   const [misDatosEquipo, setMisDatosEquipo] = useState({
     tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
@@ -51,6 +52,10 @@ export default function DashboardPage() {
       setGastos(gastosData || []);
       setJugadores(jugadoresData || []);
       setInventario(inventarioData || []);
+
+      const { data: configData } = await supabase.from('configuracion').select('*').eq('clave', 'saldo_inicial_2025').single();
+      setSaldoInicial(configData ? Number(configData.valor) : 0);
+
       setLoading(false);
 
       if (perfilData?.jugador_id) {
@@ -266,7 +271,7 @@ export default function DashboardPage() {
 
   const totalIngresos = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
   const totalEgresos = gastos.reduce((acc, g) => acc + Number(g.monto || 0), 0);
-  const saldo = totalIngresos - totalEgresos;
+  const saldo = saldoInicial + totalIngresos - totalEgresos;
 
   const sociosAlDia = jugadoresConCuotas.filter((j) =>
     Object.values(j.cuotasPorPeriodo).length > 0 &&
@@ -277,13 +282,6 @@ export default function DashboardPage() {
     cuotas.filter((c) => c.periodo === p).reduce((a, c) => a + Number(c.monto_pagado || 0), 0)
   );
   const egresosPorPeriodo = periodos.map(() => Math.round(totalEgresos / (periodos.length || 1)));
-
-  const resumenTexto =
-    `Resumen tesorería — Club Alianza Francesa\n\n` +
-    `Ingresos año: $${Math.round(totalIngresos).toLocaleString('es-CL')}\n` +
-    `Egresos año: $${Math.round(totalEgresos).toLocaleString('es-CL')}\n` +
-    `Saldo actual: $${Math.round(saldo).toLocaleString('es-CL')}\n` +
-    `Socios al día: ${sociosAlDia}/${jugadores.length}\n`;
 
   return (
     <div className="container">
@@ -314,7 +312,14 @@ export default function DashboardPage() {
       <p style={{ fontWeight: 500, marginTop: '1.5rem' }}>Inventario del club</p>
       <InventoryTable items={inventario} />
 
-      <ExportBar resumenTexto={resumenTexto} />
+      <ExportBar
+        ingresos={totalIngresos}
+        egresos={totalEgresos}
+        saldo={saldo}
+        periodos={periodos}
+        jugadoresConCuotas={jugadoresConCuotas}
+        totalSocios={jugadores.length}
+      />
 
       <div style={{ marginTop: '1.5rem' }}>
         <ChangePasswordCard />
