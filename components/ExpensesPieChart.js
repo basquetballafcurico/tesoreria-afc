@@ -12,14 +12,14 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 const COLORES = ['#2a78d6', '#e07a3e', '#4a9d6e', '#c25a5a', '#8a6bbf', '#c3a63e', '#5aa8a8', '#a3623e'];
 
 export default function ExpensesPieChart({ gastos }) {
-  const totalesPorConcepto = {};
+  const totalesPorCategoria = {};
   gastos.forEach((g) => {
-    const clave = g.concepto || 'Otros';
-    totalesPorConcepto[clave] = (totalesPorConcepto[clave] || 0) + Number(g.monto || 0);
+    const clave = g.categoria || 'Otros';
+    totalesPorCategoria[clave] = (totalesPorCategoria[clave] || 0) + Number(g.monto || 0);
   });
 
-  const etiquetas = Object.keys(totalesPorConcepto);
-  const valores = Object.values(totalesPorConcepto);
+  const etiquetas = Object.keys(totalesPorCategoria);
+  const valores = Object.values(totalesPorCategoria);
   const total = valores.reduce((a, b) => a + b, 0);
 
   if (etiquetas.length === 0) {
