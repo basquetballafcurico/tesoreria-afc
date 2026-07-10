@@ -8,7 +8,10 @@ export default function AdminPage() {
   const [autorizado, setAutorizado] = useState(false);
   const [jugadores, setJugadores] = useState([]);
   const [cuotas, setCuotas] = useState([]);
+  const [gastos, setGastos] = useState([]);
   const [inventario, setInventario] = useState([]);
+  const [saldoInicial, setSaldoInicial] = useState(0);
+  const [saldoInicialInput, setSaldoInicialInput] = useState('0');
   const [mensaje, setMensaje] = useState('');
   const [mensajeTipo, setMensajeTipo] = useState('success');
 
@@ -17,7 +20,7 @@ export default function AdminPage() {
   const [pago, setPago] = useState({
     jugador_id: '', periodo: '', monto: 60000, monto_pagado: 0, estado: 'pendiente', observaciones: '',
   });
-  const [gasto, setGasto] = useState({ fecha: '', concepto: '', monto: '' });
+  const [gasto, setGasto] = useState({ id: null, fecha: '', concepto: '', monto: '' });
   const [datosJugador, setDatosJugador] = useState({
     jugador_id: '', tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
   });
@@ -44,6 +47,13 @@ export default function AdminPage() {
       setCuotas(cuotasData || []);
       const { data: inventarioData } = await supabase.from('inventario').select('*').order('categoria');
       setInventario(inventarioData || []);
+      const { data: gastosData } = await supabase.from('gastos').select('*').order('fecha', { ascending: false });
+      setGastos(gastosData || []);
+      const { data: configData } = await supabase.from('configuracion').select('*').eq('clave', 'saldo_inicial_2025').single();
+      if (configData) {
+        setSaldoInicial(Number(configData.valor));
+        setSaldoInicialInput(String(configData.valor));
+      }
     }
     verificar();
   }, [router]);
@@ -92,9 +102,42 @@ export default function AdminPage() {
 
   async function guardarGasto(e) {
     e.preventDefault();
-    const { error } = await supabase.from('gastos').insert([gasto]);
+    const datos = { fecha: gasto.fecha, concepto: gasto.concepto, monto: Number(gasto.monto) };
+    let error;
+    if (gasto.id) {
+      ({ error } = await supabase.from('gastos').update(datos).eq('id', gasto.id));
+    } else {
+      ({ error } = await supabase.from('gastos').insert([datos]));
+    }
+    if (!error) {
+      const { data } = await supabase.from('gastos').select('*').order('fecha', { ascending: false });
+      setGastos(data || []);
+      setGasto({ id: null, fecha: '', concepto: '', monto: '' });
+    }
     mostrarMensaje(error ? 'Error al guardar el gasto.' : 'Gasto guardado correctamente.', error ? 'error' : 'success');
-    if (!error) setGasto({ fecha: '', concepto: '', monto: '' });
+  }
+
+  function editarGasto(g) {
+    setGasto({ id: g.id, fecha: g.fecha, concepto: g.concepto, monto: g.monto });
+  }
+
+  async function borrarGasto(id) {
+    const { error } = await supabase.from('gastos').delete().eq('id', id);
+    if (!error) {
+      setGastos((prev) => prev.filter((g) => g.id !== id));
+    }
+    mostrarMensaje(error ? 'Error al borrar el gasto.' : 'Gasto borrado correctamente.', error ? 'error' : 'success');
+  }
+
+  async function guardarSaldoInicial(e) {
+    e.preventDefault();
+    const valor = Number(saldoInicialInput) || 0;
+    const { error } = await supabase
+      .from('configuracion')
+      .update({ valor })
+      .eq('clave', 'saldo_inicial_2025');
+    if (!error) setSaldoInicial(valor);
+    mostrarMensaje(error ? 'Error al guardar el saldo inicial.' : 'Saldo inicial guardado correctamente.', error ? 'error' : 'success');
   }
 
   function seleccionarJugador(id) {
@@ -276,13 +319,67 @@ export default function AdminPage() {
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <p style={{ fontWeight: 500, marginTop: 0 }}>Registrar gasto</p>
-        <form onSubmit={guardarGasto} style={{ display: 'grid', gap: 10 }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Saldo en caja al cierre de 2025</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Este monto se suma al saldo actual del año, para que arrastre lo que ya tenía el club antes de 2026.
+        </p>
+        <form onSubmit={guardarSaldoInicial} style={{ display: 'flex', gap: 8, maxWidth: 320 }}>
+          <input
+            type="number"
+            value={saldoInicialInput}
+            onChange={(e) => setSaldoInicialInput(e.target.value)}
+          />
+          <button type="submit">Guardar</button>
+        </form>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>{gasto.id ? 'Editar gasto' : 'Registrar gasto'}</p>
+        <form onSubmit={guardarGasto} style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
           <input type="date" value={gasto.fecha} onChange={(e) => setGasto({ ...gasto, fecha: e.target.value })} required />
           <input placeholder="Concepto (ej: Arriendo gimnasio)" value={gasto.concepto} onChange={(e) => setGasto({ ...gasto, concepto: e.target.value })} required />
-          <input type="number" placeholder="Monto" value={gasto.monto} onChange={(e) => setGasto({ ...gasto, monto: Number(e.target.value) })} required />
-          <button type="submit">Guardar gasto</button>
+          <input type="number" placeholder="Monto" value={gasto.monto} onChange={(e) => setGasto({ ...gasto, monto: e.target.value })} required />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit">{gasto.id ? 'Guardar cambios' : 'Agregar gasto'}</button>
+            {gasto.id && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setGasto({ id: null, fecha: '', concepto: '', monto: '' })}
+              >
+                Cancelar edición
+              </button>
+            )}
+          </div>
         </form>
+
+        {gastos.length > 0 && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Concepto</th>
+                  <th>Monto</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {gastos.map((g) => (
+                  <tr key={g.id}>
+                    <td>{g.fecha}</td>
+                    <td>{g.concepto}</td>
+                    <td>${Math.round(g.monto).toLocaleString('es-CL')}</td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" className="secondary" onClick={() => editarGasto(g)}>Editar</button>
+                      <button type="button" className="secondary" onClick={() => borrarGasto(g.id)}>Borrar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card">
