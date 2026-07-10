@@ -20,7 +20,7 @@ export default function AdminPage() {
   const [pago, setPago] = useState({
     jugador_id: '', periodo: '', monto: 60000, monto_pagado: 0, estado: 'pendiente', observaciones: '',
   });
-  const [gasto, setGasto] = useState({ id: null, fecha: '', concepto: '', monto: '' });
+  const [gasto, setGasto] = useState({ id: null, fecha: '', categoria: 'Arriendo gimnasio', concepto: '', monto: '' });
   const [datosJugador, setDatosJugador] = useState({
     jugador_id: '', tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
   });
@@ -102,7 +102,7 @@ export default function AdminPage() {
 
   async function guardarGasto(e) {
     e.preventDefault();
-    const datos = { fecha: gasto.fecha, concepto: gasto.concepto, monto: Number(gasto.monto) };
+    const datos = { fecha: gasto.fecha, categoria: gasto.categoria, concepto: gasto.concepto, monto: Number(gasto.monto) };
     let error;
     if (gasto.id) {
       ({ error } = await supabase.from('gastos').update(datos).eq('id', gasto.id));
@@ -112,13 +112,13 @@ export default function AdminPage() {
     if (!error) {
       const { data } = await supabase.from('gastos').select('*').order('fecha', { ascending: false });
       setGastos(data || []);
-      setGasto({ id: null, fecha: '', concepto: '', monto: '' });
+      setGasto({ id: null, fecha: '', categoria: 'Arriendo gimnasio', concepto: '', monto: '' });
     }
     mostrarMensaje(error ? 'Error al guardar el gasto.' : 'Gasto guardado correctamente.', error ? 'error' : 'success');
   }
 
   function editarGasto(g) {
-    setGasto({ id: g.id, fecha: g.fecha, concepto: g.concepto, monto: g.monto });
+    setGasto({ id: g.id, fecha: g.fecha, categoria: g.categoria || 'Otros', concepto: g.concepto, monto: g.monto });
   }
 
   async function borrarGasto(id) {
@@ -337,7 +337,14 @@ export default function AdminPage() {
         <p style={{ fontWeight: 500, marginTop: 0 }}>{gasto.id ? 'Editar gasto' : 'Registrar gasto'}</p>
         <form onSubmit={guardarGasto} style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
           <input type="date" value={gasto.fecha} onChange={(e) => setGasto({ ...gasto, fecha: e.target.value })} required />
-          <input placeholder="Concepto (ej: Arriendo gimnasio)" value={gasto.concepto} onChange={(e) => setGasto({ ...gasto, concepto: e.target.value })} required />
+          <select value={gasto.categoria} onChange={(e) => setGasto({ ...gasto, categoria: e.target.value })}>
+            <option value="Arriendo gimnasio">Arriendo gimnasio</option>
+            <option value="Entrenador">Entrenador</option>
+            <option value="Materiales/Insumos">Materiales/Insumos</option>
+            <option value="Transporte">Transporte</option>
+            <option value="Otros">Otros</option>
+          </select>
+          <input placeholder="Descripción (ej: Claudio Quezada, 1 balón y 1 juego de petos)" value={gasto.concepto} onChange={(e) => setGasto({ ...gasto, concepto: e.target.value })} required />
           <input type="number" placeholder="Monto" value={gasto.monto} onChange={(e) => setGasto({ ...gasto, monto: e.target.value })} required />
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="submit">{gasto.id ? 'Guardar cambios' : 'Agregar gasto'}</button>
@@ -345,7 +352,7 @@ export default function AdminPage() {
               <button
                 type="button"
                 className="secondary"
-                onClick={() => setGasto({ id: null, fecha: '', concepto: '', monto: '' })}
+                onClick={() => setGasto({ id: null, fecha: '', categoria: 'Arriendo gimnasio', concepto: '', monto: '' })}
               >
                 Cancelar edición
               </button>
@@ -359,7 +366,8 @@ export default function AdminPage() {
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Concepto</th>
+                  <th>Categoría</th>
+                  <th>Descripción</th>
                   <th>Monto</th>
                   <th></th>
                 </tr>
@@ -368,6 +376,7 @@ export default function AdminPage() {
                 {gastos.map((g) => (
                   <tr key={g.id}>
                     <td>{g.fecha}</td>
+                    <td>{g.categoria || 'Otros'}</td>
                     <td>{g.concepto}</td>
                     <td>${Math.round(g.monto).toLocaleString('es-CL')}</td>
                     <td style={{ display: 'flex', gap: 6 }}>
