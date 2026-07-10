@@ -55,7 +55,7 @@ export default function DashboardPage() {
       setInventario(inventarioData || []);
 
       const { data: configData } = await supabase.from('configuracion').select('*').eq('clave', 'saldo_inicial_2025').single();
-      setSaldoInicial(configData ? Number(configData.valor) : 0);
+      setSaldoInicial(configData && configData.valor != null ? Number(configData.valor) : 0);
 
       setLoading(false);
 
