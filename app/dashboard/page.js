@@ -2,334 +2,582 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import KpiCards from '../../components/KpiCards';
-import PeriodStatusCards from '../../components/PeriodStatusCards';
-import IncomeExpenseChart from '../../components/IncomeExpenseChart';
-import ExpensesPieChart from '../../components/ExpensesPieChart';
-import QuotasTable from '../../components/QuotasTable';
-import MyQuotasTable from '../../components/MyQuotasTable';
-import ExportBar from '../../components/ExportBar';
-import ChangePasswordCard from '../../components/ChangePasswordCard';
-import InventoryTable from '../../components/InventoryTable';
 
-export default function DashboardPage() {
+export default function AdminPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [perfil, setPerfil] = useState(null);
+  const [autorizado, setAutorizado] = useState(false);
+  const [jugadores, setJugadores] = useState([]);
   const [cuotas, setCuotas] = useState([]);
   const [gastos, setGastos] = useState([]);
-  const [jugadores, setJugadores] = useState([]);
   const [inventario, setInventario] = useState([]);
   const [saldoInicial, setSaldoInicial] = useState(0);
+  const [saldoInicialInput, setSaldoInicialInput] = useState('0');
+  const [mensaje, setMensaje] = useState('');
+  const [mensajeTipo, setMensajeTipo] = useState('success');
 
-  const [misDatosEquipo, setMisDatosEquipo] = useState({
-    tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
+  const periodosConocidos = ['T1 2026', 'T2 2026', 'T3 2026'];
+
+  const [pago, setPago] = useState({
+    jugador_id: '', periodo: '', monto: 60000, monto_pagado: 0, estado: 'pendiente', observaciones: '',
   });
-  const [guardandoEquipo, setGuardandoEquipo] = useState(false);
-  const [mensajeEquipo, setMensajeEquipo] = useState('');
-  const [mensajeEquipoTipo, setMensajeEquipoTipo] = useState('success');
+  const [gasto, setGasto] = useState({ id: null, fecha: '', categoria: 'Arriendo gimnasio', concepto: '', monto: '' });
+  const [datosJugador, setDatosJugador] = useState({
+    jugador_id: '', tiene_camiseta: false, numero_camiseta: '', tiene_salida_cancha: false,
+  });
+  const [item, setItem] = useState({
+    id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '',
+  });
 
   useEffect(() => {
-    async function cargar() {
+    if (!mensaje) return;
+    const t = setTimeout(() => setMensaje(''), 4000);
+    return () => clearTimeout(t);
+  }, [mensaje]);
+
+  useEffect(() => {
+    async function verificar() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-
-      const { data: perfilData } = await supabase
-        .from('perfiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      setPerfil(perfilData);
-
-      const { data: cuotasData } = await supabase.from('cuotas').select('*');
-      const { data: gastosData } = await supabase.from('gastos').select('*');
-      const { data: jugadoresData } = await supabase.from('jugadores').select('*');
-      const { data: inventarioData } = await supabase.from('inventario').select('*').order('categoria');
-
-      setCuotas(cuotasData || []);
-      setGastos(gastosData || []);
+      if (!session) { router.push('/login'); return; }
+      const { data: perfil } = await supabase.from('perfiles').select('*').eq('id', session.user.id).single();
+      if (perfil?.rol !== 'admin') { router.push('/dashboard'); return; }
+      setAutorizado(true);
+      const { data: jugadoresData } = await supabase.from('jugadores').select('*').order('nombre');
       setJugadores(jugadoresData || []);
+      const { data: cuotasData } = await supabase.from('cuotas').select('*');
+      setCuotas(cuotasData || []);
+      const { data: inventarioData } = await supabase.from('inventario').select('*').order('categoria');
       setInventario(inventarioData || []);
-
+      const { data: gastosData } = await supabase.from('gastos').select('*').order('fecha', { ascending: false });
+      setGastos(gastosData || []);
       const { data: configData } = await supabase.from('configuracion').select('*').eq('clave', 'saldo_inicial_2025').single();
-      setSaldoInicial(configData && configData.valor != null ? Number(configData.valor) : 0);
-
-      setLoading(false);
-
-      if (perfilData?.jugador_id) {
-        const mio = (jugadoresData || []).find((j) => j.id === perfilData.jugador_id);
-        if (mio) {
-          setMisDatosEquipo({
-            tiene_camiseta: mio.tiene_camiseta || false,
-            numero_camiseta: mio.numero_camiseta ?? '',
-            tiene_salida_cancha: mio.tiene_salida_cancha || false,
-          });
-        }
+      if (configData) {
+        setSaldoInicial(Number(configData.valor));
+        setSaldoInicialInput(String(configData.valor));
       }
     }
-    cargar();
+    verificar();
   }, [router]);
 
-  async function guardarMisDatos(e) {
+  function mostrarMensaje(texto, tipo) {
+    setMensaje(texto);
+    setMensajeTipo(tipo);
+  }
+
+  function cargarCuotaExistente(jugadorId, periodo) {
+    const existente = (jugadorId && periodo)
+      ? cuotas.find((c) => String(c.jugador_id) === String(jugadorId) && c.periodo === periodo)
+      : null;
+
+    setPago({
+      jugador_id: jugadorId,
+      periodo,
+      monto: existente ? existente.monto : 60000,
+      monto_pagado: existente ? existente.monto_pagado : 0,
+      estado: existente ? existente.estado : 'pendiente',
+      observaciones: existente ? (existente.observaciones || '') : '',
+    });
+  }
+
+  async function guardarPago(e) {
     e.preventDefault();
-    if (!perfil?.jugador_id) return;
-    setGuardandoEquipo(true);
-    const numero = misDatosEquipo.numero_camiseta === '' ? null : Number(misDatosEquipo.numero_camiseta);
+    const { error } = await supabase
+      .from('cuotas')
+      .upsert(
+        [{
+          jugador_id: pago.jugador_id,
+          periodo: pago.periodo,
+          monto: pago.monto,
+          monto_pagado: pago.monto_pagado,
+          estado: pago.estado,
+          observaciones: pago.observaciones,
+        }],
+        { onConflict: 'jugador_id,periodo' }
+      );
+    if (!error) {
+      const { data: cuotasData } = await supabase.from('cuotas').select('*');
+      setCuotas(cuotasData || []);
+    }
+    mostrarMensaje(error ? 'Error al guardar el pago.' : 'Pago guardado correctamente.', error ? 'error' : 'success');
+  }
+
+  async function guardarGasto(e) {
+    e.preventDefault();
+    const datos = { fecha: gasto.fecha, categoria: gasto.categoria, concepto: gasto.concepto, monto: Number(gasto.monto) };
+    let error;
+    if (gasto.id) {
+      ({ error } = await supabase.from('gastos').update(datos).eq('id', gasto.id));
+    } else {
+      ({ error } = await supabase.from('gastos').insert([datos]));
+    }
+    if (!error) {
+      const { data } = await supabase.from('gastos').select('*').order('fecha', { ascending: false });
+      setGastos(data || []);
+      setGasto({ id: null, fecha: '', categoria: 'Arriendo gimnasio', concepto: '', monto: '' });
+    }
+    mostrarMensaje(error ? 'Error al guardar el gasto.' : 'Gasto guardado correctamente.', error ? 'error' : 'success');
+  }
+
+  function editarGasto(g) {
+    setGasto({ id: g.id, fecha: g.fecha, categoria: g.categoria || 'Otros', concepto: g.concepto, monto: g.monto });
+  }
+
+  async function borrarGasto(id) {
+    const { error } = await supabase.from('gastos').delete().eq('id', id);
+    if (!error) {
+      setGastos((prev) => prev.filter((g) => g.id !== id));
+    }
+    mostrarMensaje(error ? 'Error al borrar el gasto.' : 'Gasto borrado correctamente.', error ? 'error' : 'success');
+  }
+
+  async function guardarSaldoInicial(e) {
+    e.preventDefault();
+    const valor = Number(saldoInicialInput) || 0;
+    const { error } = await supabase
+      .from('configuracion')
+      .update({ valor })
+      .eq('clave', 'saldo_inicial_2025');
+    if (!error) setSaldoInicial(valor);
+    mostrarMensaje(error ? 'Error al guardar el saldo inicial.' : 'Saldo inicial guardado correctamente.', error ? 'error' : 'success');
+  }
+
+  function seleccionarJugador(id) {
+    const j = jugadores.find((x) => String(x.id) === String(id));
+    setDatosJugador({
+      jugador_id: id,
+      tiene_camiseta: j?.tiene_camiseta || false,
+      numero_camiseta: j?.numero_camiseta ?? '',
+      tiene_salida_cancha: j?.tiene_salida_cancha || false,
+    });
+  }
+
+  async function guardarDatosJugador(e) {
+    e.preventDefault();
     const { error } = await supabase
       .from('jugadores')
       .update({
-        tiene_camiseta: misDatosEquipo.tiene_camiseta,
-        numero_camiseta: numero,
-        tiene_salida_cancha: misDatosEquipo.tiene_salida_cancha,
+        tiene_camiseta: datosJugador.tiene_camiseta,
+        numero_camiseta: datosJugador.numero_camiseta === '' ? null : Number(datosJugador.numero_camiseta),
+        tiene_salida_cancha: datosJugador.tiene_salida_cancha,
       })
-      .eq('id', perfil.jugador_id);
-    setGuardandoEquipo(false);
+      .eq('id', datosJugador.jugador_id);
     if (!error) {
-      setJugadores((prev) =>
-        prev.map((j) =>
-          j.id === perfil.jugador_id
-            ? { ...j, tiene_camiseta: misDatosEquipo.tiene_camiseta, numero_camiseta: numero, tiene_salida_cancha: misDatosEquipo.tiene_salida_cancha }
-            : j
-        )
-      );
-      setMensajeEquipo('Datos guardados correctamente.');
-      setMensajeEquipoTipo('success');
-    } else {
-      setMensajeEquipo('No se pudo guardar. Intenta de nuevo.');
-      setMensajeEquipoTipo('error');
+      const { data } = await supabase.from('jugadores').select('*').order('nombre');
+      setJugadores(data || []);
     }
+    mostrarMensaje(error ? 'Error al guardar los datos del jugador.' : 'Datos del jugador actualizados correctamente.', error ? 'error' : 'success');
   }
 
-  useEffect(() => {
-    if (!mensajeEquipo) return;
-    const t = setTimeout(() => setMensajeEquipo(''), 4000);
-    return () => clearTimeout(t);
-  }, [mensajeEquipo]);
+  const [enviandoRecordatorios, setEnviandoRecordatorios] = useState(false);
+  const [correoPrueba, setCorreoPrueba] = useState('');
 
-  if (loading) {
-    return <div className="container">Cargando…</div>;
+  async function enviarRecordatoriosAhora(modoPrueba) {
+    if (modoPrueba && !correoPrueba) {
+      mostrarMensaje('Escribe tu correo arriba para hacer la prueba.', 'error');
+      return;
+    }
+    setEnviandoRecordatorios(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const res = await fetch('/api/recordatorios', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ correoPrueba: modoPrueba ? correoPrueba : null }),
+      });
+      const data = await res.json();
+      mostrarMensaje(res.ok ? `Recordatorios enviados correctamente: ${data.enviados}` : `Error: ${data.error}`, res.ok ? 'success' : 'error');
+    } catch (e) {
+      mostrarMensaje('No se pudo conectar con el servidor.', 'error');
+    }
+    setEnviandoRecordatorios(false);
   }
 
-  const esAdmin = perfil?.rol === 'admin';
-  const periodos = [...new Set(cuotas.map((c) => c.periodo))].sort();
-
-  async function cerrarSesion() {
-    await supabase.auth.signOut();
-    router.push('/login');
+  async function guardarItem(e) {
+    e.preventDefault();
+    const datos = {
+      nombre: item.nombre,
+      categoria: item.categoria,
+      cantidad: Number(item.cantidad),
+      estado: item.estado,
+      notas: item.notas,
+    };
+    let error;
+    if (item.id) {
+      ({ error } = await supabase.from('inventario').update(datos).eq('id', item.id));
+    } else {
+      ({ error } = await supabase.from('inventario').insert([datos]));
+    }
+    if (!error) {
+      const { data } = await supabase.from('inventario').select('*').order('categoria');
+      setInventario(data || []);
+      setItem({ id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '' });
+    }
+    mostrarMensaje(error ? 'Error al guardar el artículo.' : 'Artículo guardado correctamente.', error ? 'error' : 'success');
   }
 
-  const header = (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="no-print">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <img src="/logo-af.png" alt="Logo Alianza Francesa Basket" style={{ width: 40, height: 40 }} />
-        <div>
-          <p style={{ fontWeight: 600, margin: 0 }}>Tesorería — Club Alianza Francesa</p>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-            {esAdmin ? 'Vista de dirigente' : 'Tu estado de cuenta'}
-          </p>
+  function editarItem(i) {
+    setItem({
+      id: i.id, nombre: i.nombre, categoria: i.categoria, cantidad: i.cantidad, estado: i.estado, notas: i.notas || '',
+    });
+  }
+
+  async function borrarItem(id) {
+    const { error } = await supabase.from('inventario').delete().eq('id', id);
+    if (!error) {
+      setInventario((prev) => prev.filter((i) => i.id !== id));
+    }
+    mostrarMensaje(error ? 'Error al borrar el artículo.' : 'Artículo borrado correctamente.', error ? 'error' : 'success');
+  }
+
+  function descargarListadoJugadores() {
+    const filas = [...jugadores]
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+      .map((j, i) => `<tr><td style="text-align:center;">${i + 1}</td><td>${j.nombre}</td></tr>`)
+      .join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Listado del equipo</title>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: -apple-system, Arial, sans-serif; padding: 32px; color: #16150f; }
+            h1 { font-size: 18px; margin-bottom: 4px; }
+            p { color: #5f5e5a; font-size: 13px; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; font-size: 14px; }
+            th { background: #f0f0ec; }
+          </style>
+        </head>
+        <body>
+          <h1>Listado del equipo — Club Alianza Francesa</h1>
+          <p>Total: ${jugadores.length} jugadores</p>
+          <table>
+            <thead><tr><th style="width:40px;">N°</th><th>Nombre</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const ventana = window.open('', '_blank');
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.focus();
+    setTimeout(() => ventana.print(), 300);
+  }
+
+  if (!autorizado) return <div className="container">Verificando acceso…</div>;
+
+  return (
+    <div className="container">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p style={{ fontWeight: 600 }}>Administración</p>
+        <button className="secondary" onClick={() => router.push('/dashboard')}>Volver al dashboard</button>
+      </div>
+      {mensaje && (
+        <div
+          className="card"
+          style={{
+            marginBottom: '1.5rem',
+            padding: '0.75rem 1rem',
+            background: mensajeTipo === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+            color: mensajeTipo === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
+            fontWeight: 500,
+          }}
+        >
+          {mensajeTipo === 'success' ? '✓ ' : '⚠ '}{mensaje}
         </div>
+      )}
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Listado del equipo</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Genera un PDF con el nombre de los {jugadores.length} jugadores del club, en orden alfabético.
+        </p>
+        <button className="secondary" onClick={descargarListadoJugadores}>Descargar listado (PDF)</button>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {esAdmin && (
-          <button className="secondary" onClick={() => router.push('/admin')}>Administración</button>
-        )}
-        <button className="secondary" onClick={cerrarSesion}>Cerrar sesión</button>
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Registrar / actualizar pago de cuota</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Elige jugador y periodo: si ya existe una cuota cargada, se completa sola para que la corrijas.
+        </p>
+        <form onSubmit={guardarPago} style={{ display: 'grid', gap: 10 }}>
+          <select
+            value={pago.jugador_id}
+            onChange={(e) => cargarCuotaExistente(e.target.value, pago.periodo)}
+            required
+          >
+            <option value="">Selecciona jugador</option>
+            {jugadores.map((j) => <option key={j.id} value={j.id}>{j.nombre}</option>)}
+          </select>
+
+          <select
+            value={pago.periodo}
+            onChange={(e) => cargarCuotaExistente(pago.jugador_id, e.target.value)}
+            required
+          >
+            <option value="">Selecciona periodo</option>
+            {periodosConocidos.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+              Monto de la cuota (lo que corresponde pagar)
+            </label>
+            <input
+              type="number"
+              value={pago.monto}
+              onChange={(e) => setPago({ ...pago, monto: Number(e.target.value) })}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+              Monto pagado hasta ahora
+            </label>
+            <input
+              type="number"
+              value={pago.monto_pagado}
+              onChange={(e) => setPago({ ...pago, monto_pagado: Number(e.target.value) })}
+            />
+          </div>
+
+          <select value={pago.estado} onChange={(e) => setPago({ ...pago, estado: e.target.value })}>
+            <option value="pendiente">Pendiente</option>
+            <option value="pagado">Pagado</option>
+            <option value="parcial">Pago parcial</option>
+            <option value="descuento">Descuento / acuerdo especial</option>
+          </select>
+
+          <input
+            placeholder="Observaciones (opcional)"
+            value={pago.observaciones}
+            onChange={(e) => setPago({ ...pago, observaciones: e.target.value })}
+          />
+
+          <button type="submit" disabled={!pago.jugador_id || !pago.periodo}>Guardar pago</button>
+        </form>
       </div>
-    </div>
-  );
 
-  if (!esAdmin) {
-    const miJugador = jugadores.find((j) => j.id === perfil?.jugador_id);
-    const cuotasPorPeriodo = {};
-    cuotas.forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Saldo en caja al cierre de 2025</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Este monto se suma al saldo actual del año, para que arrastre lo que ya tenía el club antes de 2026.
+        </p>
+        <form onSubmit={guardarSaldoInicial} style={{ display: 'flex', gap: 8, maxWidth: 320 }}>
+          <input
+            type="number"
+            value={saldoInicialInput}
+            onChange={(e) => setSaldoInicialInput(e.target.value)}
+          />
+          <button type="submit">Guardar</button>
+        </form>
+      </div>
 
-    const totalPagado = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
-    const totalPendiente = cuotas.reduce(
-      (acc, c) => acc + Math.max(Number(c.monto || 0) - Number(c.monto_pagado || 0), 0), 0
-    );
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>{gasto.id ? 'Editar gasto' : 'Registrar gasto'}</p>
+        <form onSubmit={guardarGasto} style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+          <input type="date" value={gasto.fecha} onChange={(e) => setGasto({ ...gasto, fecha: e.target.value })} required />
+          <select value={gasto.categoria} onChange={(e) => setGasto({ ...gasto, categoria: e.target.value })}>
+            <option value="Arriendo gimnasio">Arriendo gimnasio</option>
+            <option value="Entrenador">Entrenador</option>
+            <option value="Materiales/Insumos">Materiales/Insumos</option>
+            <option value="Transporte">Transporte</option>
+            <option value="Otros">Otros</option>
+          </select>
+          <input placeholder="Descripción (ej: Claudio Quezada, 1 balón y 1 juego de petos)" value={gasto.concepto} onChange={(e) => setGasto({ ...gasto, concepto: e.target.value })} required />
+          <input type="number" placeholder="Monto" value={gasto.monto} onChange={(e) => setGasto({ ...gasto, monto: e.target.value })} required />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit">{gasto.id ? 'Guardar cambios' : 'Agregar gasto'}</button>
+            {gasto.id && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setGasto({ id: null, fecha: '', categoria: 'Arriendo gimnasio', concepto: '', monto: '' })}
+              >
+                Cancelar edición
+              </button>
+            )}
+          </div>
+        </form>
 
-    return (
-      <div className="container">
-        {header}
-
-        {miJugador && (
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <p style={{ fontWeight: 500, marginTop: 0, marginBottom: 12 }}>Mis datos</p>
+        {gastos.length > 0 && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
             <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Categoría</th>
+                  <th>Descripción</th>
+                  <th>Monto</th>
+                  <th></th>
+                </tr>
+              </thead>
               <tbody>
-                <tr>
-                  <td style={{ color: 'var(--text-secondary)', width: 160 }}>Nombre</td>
-                  <td>{miJugador.nombre}</td>
-                </tr>
-                <tr>
-                  <td style={{ color: 'var(--text-secondary)' }}>Correo</td>
-                  <td>{miJugador.email}</td>
-                </tr>
+                {gastos.map((g) => (
+                  <tr key={g.id}>
+                    <td>{g.fecha}</td>
+                    <td>{g.categoria || 'Otros'}</td>
+                    <td>{g.concepto}</td>
+                    <td>${Math.round(g.monto).toLocaleString('es-CL')}</td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" className="secondary" onClick={() => editarGasto(g)}>Editar</button>
+                      <button type="button" className="secondary" onClick={() => borrarGasto(g.id)}>Borrar</button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
+      </div>
 
-        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-          <div className="card">
-            <p className="kpi-label">Pagado este año</p>
-            <p className="kpi-value">${Math.round(totalPagado).toLocaleString('es-CL')}</p>
-          </div>
-          <div
-            className="card"
-            style={totalPendiente > 0 ? { background: 'var(--warning-bg)' } : { background: 'var(--success-bg)' }}
-          >
-            <p className="kpi-label" style={{ color: totalPendiente > 0 ? 'var(--warning-text)' : 'var(--success-text)' }}>
-              Monto pendiente
-            </p>
-            <p className="kpi-value" style={{ color: totalPendiente > 0 ? 'var(--warning-text)' : 'var(--success-text)' }}>
-              ${Math.round(totalPendiente).toLocaleString('es-CL')}
-            </p>
-          </div>
+      <div className="card">
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Recordatorios de pago</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Se envían solos el día 1 de cada mes a quienes tengan cuotas pendientes.
+        </p>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+            Tu correo (para probar antes de mandar a todos)
+          </label>
+          <input
+            type="email"
+            placeholder="tu-correo@ejemplo.cl"
+            value={correoPrueba}
+            onChange={(e) => setCorreoPrueba(e.target.value)}
+            style={{ width: '100%', maxWidth: 320 }}
+          />
         </div>
 
-        <p style={{ fontWeight: 500 }}>Tus cuotas</p>
-        <MyQuotasTable periodos={periodos} cuotasPorPeriodo={cuotasPorPeriodo} />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="secondary" onClick={() => enviarRecordatoriosAhora(true)} disabled={enviandoRecordatorios}>
+            {enviandoRecordatorios ? 'Enviando…' : 'Probar (todo llega a mi correo)'}
+          </button>
+          <button onClick={() => enviarRecordatoriosAhora(false)} disabled={enviandoRecordatorios}>
+            {enviandoRecordatorios ? 'Enviando…' : 'Enviar de verdad a todos los jugadores'}
+          </button>
+        </div>
+      </div>
 
-        <p style={{ fontWeight: 500, marginTop: '1.5rem' }}>Inventario del club</p>
-        <InventoryTable items={inventario} />
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '1.5rem' }}>
-          <ChangePasswordCard />
-
-          <div className="card no-print" style={{ marginBottom: '1.5rem' }}>
-            <p style={{ fontWeight: 500, marginTop: 0, marginBottom: 12 }}>Mi equipo</p>
-            {mensajeEquipo && (
-              <div
-                style={{
-                  marginBottom: 12,
-                  padding: '0.6rem 0.8rem',
-                  borderRadius: 8,
-                  background: mensajeEquipoTipo === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
-                  color: mensajeEquipoTipo === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
-                  fontWeight: 500,
-                  fontSize: 14,
-                }}
+      <div className="card" style={{ marginBottom: '1.5rem', marginTop: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Inventario del club</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Visible para todos (jugadores y admin). Solo tú puedes agregar, editar o borrar.
+        </p>
+        <form onSubmit={guardarItem} style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+          <input
+            placeholder="Nombre del artículo (ej: Pelotas talla 7)"
+            value={item.nombre}
+            onChange={(e) => setItem({ ...item, nombre: e.target.value })}
+            required
+          />
+          <select value={item.categoria} onChange={(e) => setItem({ ...item, categoria: e.target.value })}>
+            <option value="Pelotas">Pelotas</option>
+            <option value="Petos">Petos</option>
+            <option value="Botiquín">Botiquín</option>
+            <option value="Uniformes">Uniformes</option>
+            <option value="Otros">Otros</option>
+          </select>
+          <input
+            type="number"
+            placeholder="Cantidad"
+            value={item.cantidad}
+            onChange={(e) => setItem({ ...item, cantidad: e.target.value })}
+            min="0"
+            required
+          />
+          <select value={item.estado} onChange={(e) => setItem({ ...item, estado: e.target.value })}>
+            <option value="bueno">Bueno</option>
+            <option value="regular">Regular</option>
+            <option value="malo">Malo</option>
+            <option value="perdido">Perdido</option>
+          </select>
+          <input
+            placeholder="Notas (opcional)"
+            value={item.notas}
+            onChange={(e) => setItem({ ...item, notas: e.target.value })}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit">{item.id ? 'Guardar cambios' : 'Agregar artículo'}</button>
+            {item.id && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setItem({ id: null, nombre: '', categoria: 'Pelotas', cantidad: 1, estado: 'bueno', notas: '' })}
               >
-                {mensajeEquipoTipo === 'success' ? '✓ ' : '⚠ '}{mensajeEquipo}
-              </div>
-            )}
-            <form onSubmit={guardarMisDatos} style={{ display: 'grid', gap: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-                <input
-                  type="checkbox"
-                  checked={misDatosEquipo.tiene_camiseta}
-                  onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, tiene_camiseta: e.target.checked })}
-                />
-                Tengo camiseta
-              </label>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-                  Número de camiseta
-                </label>
-                <input
-                  type="number"
-                  placeholder="Ej: 7"
-                  value={misDatosEquipo.numero_camiseta}
-                  onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, numero_camiseta: e.target.value })}
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-                <input
-                  type="checkbox"
-                  checked={misDatosEquipo.tiene_salida_cancha}
-                  onChange={(e) => setMisDatosEquipo({ ...misDatosEquipo, tiene_salida_cancha: e.target.checked })}
-                />
-                Tengo salida de cancha
-              </label>
-              <button type="submit" disabled={guardandoEquipo}>
-                {guardandoEquipo ? 'Guardando…' : 'Guardar'}
+                Cancelar edición
               </button>
-            </form>
+            )}
           </div>
-        </div>
-      </div>
-    );
-  }
+        </form>
 
-  const jugadoresConCuotas = jugadores.map((j) => {
-    const cuotasPorPeriodo = {};
-    cuotas
-      .filter((c) => c.jugador_id === j.id)
-      .forEach((c) => { cuotasPorPeriodo[c.periodo] = c; });
-    return {
-      nombre: j.nombre,
-      tieneCamiseta: j.tiene_camiseta,
-      numeroCamiseta: j.numero_camiseta,
-      tieneSalidaCancha: j.tiene_salida_cancha,
-      cuotasPorPeriodo,
-    };
-  });
-
-  const totalIngresos = cuotas.reduce((acc, c) => acc + Number(c.monto_pagado || 0), 0);
-  const totalEgresos = gastos.reduce((acc, g) => acc + Number(g.monto || 0), 0);
-  const saldo = saldoInicial + totalIngresos - totalEgresos;
-
-  const sociosAlDia = jugadoresConCuotas.filter((j) =>
-    Object.values(j.cuotasPorPeriodo).length > 0 &&
-    Object.values(j.cuotasPorPeriodo).every((c) => c.estado === 'pagado' || c.estado === 'descuento')
-  ).length;
-
-  const ingresosPorPeriodo = periodos.map((p) =>
-    cuotas.filter((c) => c.periodo === p).reduce((a, c) => a + Number(c.monto_pagado || 0), 0)
-  );
-  const egresosPorPeriodo = periodos.map(() => Math.round(totalEgresos / (periodos.length || 1)));
-
-  return (
-    <div className="container">
-      {header}
-
-      <KpiCards
-        ingresos={totalIngresos}
-        egresos={totalEgresos}
-        saldo={saldo}
-        saldoInicial={saldoInicial}
-      />
-
-      <div style={{ marginBottom: '1.5rem' }}>
-        <PeriodStatusCards
-          periodos={periodos}
-          jugadoresConCuotas={jugadoresConCuotas}
-          totalSocios={jugadores.length}
-        />
+        {inventario.length > 0 && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Artículo</th>
+                  <th>Cant.</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventario.map((i) => (
+                  <tr key={i.id}>
+                    <td>{i.nombre} <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>({i.categoria})</span></td>
+                    <td>{i.cantidad}</td>
+                    <td>{i.estado}</td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" className="secondary" onClick={() => editarItem(i)}>Editar</button>
+                      <button type="button" className="secondary" onClick={() => borrarItem(i.id)}>Borrar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <p style={{ fontWeight: 500, marginTop: 0 }}>Ingresos vs egresos</p>
-        <IncomeExpenseChart periodos={periodos} ingresos={ingresosPorPeriodo} egresos={egresosPorPeriodo} />
-      </div>
-
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <p style={{ fontWeight: 500, marginTop: 0 }}>Gastos por concepto</p>
-        <ExpensesPieChart gastos={gastos} />
-      </div>
-
-      <p style={{ fontWeight: 500 }}>Estado de cuotas</p>
-      <QuotasTable jugadores={jugadoresConCuotas} periodos={periodos} />
-
-      <p style={{ fontWeight: 500, marginTop: '1.5rem' }}>Inventario del club</p>
-      <InventoryTable items={inventario} />
-
-      <ExportBar
-        ingresos={totalIngresos}
-        egresos={totalEgresos}
-        saldo={saldo}
-        periodos={periodos}
-        jugadoresConCuotas={jugadoresConCuotas}
-        totalSocios={jugadores.length}
-      />
-
-      <div style={{ marginTop: '1.5rem' }}>
-        <ChangePasswordCard />
+      <div className="card" style={{ marginTop: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Camiseta y salida de cancha</p>
+        <form onSubmit={guardarDatosJugador} style={{ display: 'grid', gap: 10 }}>
+          <select value={datosJugador.jugador_id} onChange={(e) => seleccionarJugador(e.target.value)} required>
+            <option value="">Selecciona jugador</option>
+            {jugadores.map((j) => <option key={j.id} value={j.id}>{j.nombre}</option>)}
+          </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={datosJugador.tiene_camiseta}
+              onChange={(e) => setDatosJugador({ ...datosJugador, tiene_camiseta: e.target.checked })}
+            />
+            Tiene camiseta
+          </label>
+          <input
+            type="number"
+            placeholder="Número de camiseta"
+            value={datosJugador.numero_camiseta}
+            onChange={(e) => setDatosJugador({ ...datosJugador, numero_camiseta: e.target.value })}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={datosJugador.tiene_salida_cancha}
+              onChange={(e) => setDatosJugador({ ...datosJugador, tiene_salida_cancha: e.target.checked })}
+            />
+            Tiene salida de cancha
+          </label>
+          <button type="submit" disabled={!datosJugador.jugador_id}>Guardar datos</button>
+        </form>
       </div>
     </div>
   );
