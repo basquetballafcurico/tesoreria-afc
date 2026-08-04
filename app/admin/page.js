@@ -231,6 +231,44 @@ export default function AdminPage() {
     mostrarMensaje(error ? 'Error al borrar el artículo.' : 'Artículo borrado correctamente.', error ? 'error' : 'success');
   }
 
+  function descargarListadoJugadores() {
+    const filas = [...jugadores]
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+      .map((j, i) => `<tr><td style="text-align:center;">${i + 1}</td><td>${j.nombre}</td></tr>`)
+      .join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Listado del equipo</title>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: -apple-system, Arial, sans-serif; padding: 32px; color: #16150f; }
+            h1 { font-size: 18px; margin-bottom: 4px; }
+            p { color: #5f5e5a; font-size: 13px; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; font-size: 14px; }
+            th { background: #f0f0ec; }
+          </style>
+        </head>
+        <body>
+          <h1>Listado del equipo — Club Alianza Francesa</h1>
+          <p>Total: ${jugadores.length} jugadores</p>
+          <table>
+            <thead><tr><th style="width:40px;">N°</th><th>Nombre</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const ventana = window.open('', '_blank');
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.focus();
+    setTimeout(() => ventana.print(), 300);
+  }
+
   if (!autorizado) return <div className="container">Verificando acceso…</div>;
 
   return (
@@ -253,6 +291,14 @@ export default function AdminPage() {
           {mensajeTipo === 'success' ? '✓ ' : '⚠ '}{mensaje}
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <p style={{ fontWeight: 500, marginTop: 0 }}>Listado del equipo</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
+          Genera un PDF con el nombre de los {jugadores.length} jugadores del club, en orden alfabético.
+        </p>
+        <button className="secondary" onClick={descargarListadoJugadores}>Descargar listado (PDF)</button>
+      </div>
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <p style={{ fontWeight: 500, marginTop: 0 }}>Registrar / actualizar pago de cuota</p>
@@ -420,7 +466,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <div className="card" style={{ marginBottom: '1.5rem', marginTop: '1.5rem' }}>
         <p style={{ fontWeight: 500, marginTop: 0 }}>Inventario del club</p>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: -6 }}>
           Visible para todos (jugadores y admin). Solo tú puedes agregar, editar o borrar.
