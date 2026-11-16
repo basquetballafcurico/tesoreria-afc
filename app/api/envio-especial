@@ -1,0 +1,78 @@
+// Archivo: app/api/envio-especial/route.js
+// Envío ÚNICO del recordatorio de cuota pendiente SOLO a esta lista.
+// Mismo formato del recordatorio mensual: detalle de lo pendiente de cada jugador.
+// Protegido con CRON_SECRET. Solo envía el 16-11-2026 (hora de Chile).
+import nodemailer from 'nodemailer'
+import { getSupabaseAdmin } from '../../../lib/supabaseAdmin'
+
+const DESTINATARIOS = [
+  'francisco_ceballos@live.cl',
+  'Cristobal.jure@gmail.com',
+  'Cabrera.Daniel.alanis@gmail.com',
+  'luis.mejiass@gmail.com',
+  'sergiemc@gmail.com',
+  'fdesriviers@gmail.com',
+]
+const FECHA_PERMITIDA = '2026-11-16'
+const ASUNTO = 'Recordatorio de cuota pendiente — Club Alianza Francesa'
+const clp = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL')
+
+export async function GET(request) {
+  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 })
+  }
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
+  const prueba = new URL(request.url).searchParams.get('prueba') // correo donde recibir la prueba
+  if (hoy !== FECHA_PERMITIDA && !prueba) {
+    return Response.json({ ok: false, motivo: `Hoy es ${hoy}; solo envía el ${FECHA_PERMITIDA}` })
+  }
+
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from('cuotas')
+    .select('periodo, monto, monto_pagado, estado, jugadores(nombre, email)')
+    .in('estado', ['pendiente', 'parcial'])
+  if (error) return Response.json({ ok: false, error: error.message }, { status: 500 })
+
+  const permitidos = DESTINATARIOS.map((e) => e.toLowerCase())
+  const porJugador = {}
+  for (const c of data || []) {
+    const j = c.jugadores
+    if (!j || !permitidos.includes((j.email || '').toLowerCase())) continue
+    ;(porJugador[j.email.toLowerCase()] ||= { nombre: j.nombre, email: j.email, cuotas: [] }).cuotas.push(c)
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+  })
+
+  const resultados = []
+  for (const correo of permitidos) {
+    const p = porJugador[correo]
+    if (!p) { resultados.push({ correo, ok: false, motivo: 'sin cuotas pendientes (o no está en la base)' }); continue }
+    const lineas = p.cuotas.map((c) => `• ${c.periodo}: pendiente ${clp(c.monto - c.monto_pagado)} (cuota ${clp(c.monto)}, pagado ${clp(c.monto_pagado)})`)
+    const total = p.cuotas.reduce((s, c) => s + (Number(c.monto) - Number(c.monto_pagado)), 0)
+    const texto = [
+      `Hola ${p.nombre},`, '',
+      'Te recordamos que tienes cuotas pendientes en el Club Alianza Francesa Básquetbol:', '',
+      ...lineas, '',
+      `Total pendiente: ${clp(total)}`, '',
+      'Nota: los montos no consideran acuerdos especiales de pago. Si ya pagaste o tienes un acuerdo distinto, ignora este mensaje y avísanos.', '',
+      'Puedes revisar el detalle en https://tesoreria-afc.vercel.app', '',
+      'Saludos,', 'Tesorería Club Alianza Francesa Básquetbol',
+    ].join('\n')
+    try {
+      await transporter.sendMail({
+        from: `Tesorería Club Alianza Francesa <${process.env.GMAIL_USER}>`,
+        to: prueba || p.email,
+        subject: prueba ? `[PRUEBA] Iría a ${p.nombre} <${p.email}>` : ASUNTO,
+        text: texto,
+      })
+      resultados.push({ correo, ok: true })
+    } catch (e) {
+      resultados.push({ correo, ok: false, error: String(e.message || e) })
+    }
+  }
+  return Response.json({ ok: true, resultados })
+}
